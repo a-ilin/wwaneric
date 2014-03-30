@@ -136,10 +136,34 @@ public:
     return globalResult;
   }
 
+  bool updat(const DatabaseKey &key, const T& t)
+  {
+    Database * db = DatabaseManager::instance();
+
+    QSqlQuery query = queryUpdat(db, key, t);
+
+    bool result = query.exec();
+    if (!result)
+    {
+      Q_LOGEX(LOG_VERBOSE_ERROR, QString(query.lastError().text() + QString(" ::: ") + query.lastQuery()));
+    }
+
+    return result;
+  }
+
   bool delet(const DatabaseKey &key = DatabaseKey()) const
   {
-    // TODO: To be implemented
-    return true;
+    Database * db = DatabaseManager::instance();
+
+    QSqlQuery query = queryDelet(db, key);
+
+    bool result = query.exec();
+    if (!result)
+    {
+      Q_LOGEX(LOG_VERBOSE_ERROR, QString(query.lastError().text() + QString(" ::: ") + query.lastQuery()));
+    }
+
+    return result;
   }
 
   // TODO: To be implemented
@@ -154,15 +178,18 @@ protected:
 
 
   // convert DatabaseKey into query select
-  virtual QSqlQuery querySelect(Database *db, const DatabaseKey &key) const = 0;
+  virtual QSqlQuery querySelect(Database *db, const DatabaseKey& key) const = 0;
   // create an instance from values returned by querySelect
-  virtual T createFromSelect(const QList<QVariant> &values) const = 0;
+  virtual T createFromSelect(const QList<QVariant>& values) const = 0;
 
   // convert a value into query insert
   virtual QSqlQuery queryInsert(Database *db, const T& value) const = 0;
 
+  // convert a value into query updat
+  virtual QSqlQuery queryUpdat(Database *db, const DatabaseKey &key, const T& value) const = 0;
+
   // convert a value into query delete
-  //virtual QSqlQuery queryDelete(Database *db, const T& value) const = 0;
+  virtual QSqlQuery queryDelet(Database *db, const DatabaseKey &key) const = 0;
 };
 
 #endif // DATABASE_H

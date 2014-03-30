@@ -112,6 +112,10 @@ protected:
   Sms createFromSelect(const QList<QVariant> &values) const;
 
   QSqlQuery queryInsert(Database *db, const Sms &value) const;
+
+  QSqlQuery queryUpdat(Database *db, const DatabaseKey &key, const Sms &value) const;
+
+  QSqlQuery queryDelet(Database *db, const DatabaseKey &key) const;
 };
 
 

@@ -19,6 +19,24 @@ SmsView::SmsView(QWidget *parent) :
   connect(ui->lwSmsDrafts, SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(smsContextMenuRequested(QPoint)));
 }
 
+SmsView::~SmsView()
+{
+  delete ui;
+}
+
+void SmsView::changeEvent(QEvent *e)
+{
+  QWidget::changeEvent(e);
+  switch (e->type())
+  {
+  case QEvent::LanguageChange:
+    ui->retranslateUi(this);
+    break;
+  default:
+    break;
+  }
+}
+
 void SmsView::init()
 {
   Modem * modem = Core::instance()->modem();
@@ -34,8 +52,10 @@ void SmsView::tini()
 void SmsView::restore(Settings &set)
 {
   SmsDatabaseEntity smsDb;
-  smsDb.init();
-  updateSms(smsDb.select());
+  if (smsDb.init())
+  {
+    updateSms(smsDb.select());
+  }
 }
 
 void SmsView::store(Settings &set)
@@ -142,8 +162,10 @@ void SmsView::updateSmsFromModem()
 
   // write to DB
   SmsDatabaseEntity smsDb;
-  smsDb.init();
-  smsDb.insert(smsList);
+  if (smsDb.init())
+  {
+    smsDb.insert(smsList);
+  }
 
   updateSms(smsList);
 }
@@ -157,7 +179,7 @@ void SmsView::updateSms(const QList<Sms> &smsList)
 
   // TODO: Make SMS list sorting by date, but unread must be first!
 
-  foreach(Sms sms, smsList)
+  foreach(const Sms &sms, smsList)
   {
     QString smsText =
         tr("Timestamp: ") + sms.dateTime().toString() + QString("\n") +

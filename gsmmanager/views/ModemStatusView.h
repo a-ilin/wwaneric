@@ -16,6 +16,7 @@ class ModemStatusView : public QWidget, public IView
 
 public:
   explicit ModemStatusView(QWidget *parent = 0);
+  ~ModemStatusView();
 
   void init();
   void tini();
@@ -31,6 +32,10 @@ public slots:
 
 
 signals:
+
+protected:
+  void changeEvent(QEvent *e);
+
 
 private:
 

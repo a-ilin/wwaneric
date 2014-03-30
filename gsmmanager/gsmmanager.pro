@@ -40,7 +40,9 @@ SOURCES += \
     Settings.cpp \
     views/SmsView.cpp \
     views/SettingsView.cpp \
-    views/ModemStatusView.cpp
+    views/ModemStatusView.cpp \
+    views/UssdView.cpp \
+    Ussd.cpp
 
 HEADERS  += \
     common.h \
@@ -54,13 +56,16 @@ HEADERS  += \
     Settings.h \
     views/SmsView.h \
     views/SettingsView.h \
-    views/ModemStatusView.h
+    views/ModemStatusView.h \
+    views/UssdView.h \
+    Ussd.h
 
 FORMS    += \
     MainWindow.ui \
     views/SmsView.ui \
     views/SettingsView.ui \
-    views/ModemStatusView.ui
+    views/ModemStatusView.ui \
+    views/UssdView.ui
 
 RESOURCES += \
     icons.qrc

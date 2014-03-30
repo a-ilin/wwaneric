@@ -11,6 +11,24 @@ ModemStatusView::ModemStatusView(QWidget *parent) :
   ui->setupUi(this);
 }
 
+ModemStatusView::~ModemStatusView()
+{
+  delete ui;
+}
+
+void ModemStatusView::changeEvent(QEvent *e)
+{
+  QWidget::changeEvent(e);
+  switch (e->type())
+  {
+  case QEvent::LanguageChange:
+    ui->retranslateUi(this);
+    break;
+  default:
+    break;
+  }
+}
+
 void ModemStatusView::init()
 {
   Modem * modem = Core::instance()->modem();

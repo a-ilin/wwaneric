@@ -15,6 +15,24 @@ SettingsView::SettingsView(QWidget *parent) :
   connect(ui->cbComPort, SIGNAL(currentIndexChanged(int)), this, SLOT(serialPortChanged(int)));
 }
 
+SettingsView::~SettingsView()
+{
+  delete ui;
+}
+
+void SettingsView::changeEvent(QEvent *e)
+{
+  QWidget::changeEvent(e);
+  switch (e->type())
+  {
+  case QEvent::LanguageChange:
+    ui->retranslateUi(this);
+    break;
+  default:
+    break;
+  }
+}
+
 void SettingsView::init()
 {
   Modem * modem = Core::instance()->modem();

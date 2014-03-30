@@ -18,6 +18,7 @@ class SmsView : public QWidget, public IView
 
 public:
   explicit SmsView(QWidget *parent = 0);
+  ~SmsView();
 
   void init();
   void tini();
@@ -33,6 +34,9 @@ public slots:
 
 
 signals:
+
+protected:
+  void changeEvent(QEvent *e);
 
 private:
   void fillSmsTextAndTooltip(Sms *sms, QString * smsText, QString * smsTooltip) const;

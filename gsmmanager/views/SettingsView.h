@@ -16,6 +16,7 @@ class SettingsView : public QWidget, public IView
 
 public:
   explicit SettingsView(QWidget *parent = 0);
+  ~SettingsView();
 
   void init();
   void tini();
@@ -31,6 +32,9 @@ public slots:
 
 
 signals:
+
+protected:
+  void changeEvent(QEvent *e);
 
 private:
 

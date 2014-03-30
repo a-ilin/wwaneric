@@ -114,9 +114,9 @@ QSqlQuery SmsDatabaseEntity::querySelect(Database *db, const DatabaseKey &key) c
   resultString.append(" WHERE ");
 
   QStringList acceptedValues;
-  acceptedValues << "storage";
-  acceptedValues << "index";
-  acceptedValues << "status";
+  acceptedValues << "i_storage";
+  acceptedValues << "i_index";
+  acceptedValues << "i_status";
 
   bool needAnd = false;
 
@@ -234,15 +234,25 @@ QSqlQuery SmsDatabaseEntity::queryInsert(Database *db, const Sms &value) const
   QString resultString =
       "INSERT OR REPLACE "
       "INTO sms (i_storage, i_index, i_status, a_raw) "
-      "VALUES (:storage, :index, :status, :raw)";
+      "VALUES (:i_storage, :i_index, :i_status, :a_raw)";
 
   QSqlQuery query(db->qDatabase());
 
   query.prepare(resultString);
-  query.bindValue(":storage", (int)value.storage());
-  query.bindValue(":index", value.index());
-  query.bindValue(":status", (int)value.status());
-  query.bindValue(":raw", QString(value.rawData()));
+  query.bindValue(":i_storage", (int)value.storage());
+  query.bindValue(":i_index", value.index());
+  query.bindValue(":i_status", (int)value.status());
+  query.bindValue(":a_raw", QString(value.rawData()));
 
   return query;
+}
+
+QSqlQuery SmsDatabaseEntity::queryUpdat(Database *db, const DatabaseKey &key, const Sms &value) const
+{
+  return QSqlQuery();
+}
+
+QSqlQuery SmsDatabaseEntity::queryDelet(Database *db, const DatabaseKey &key) const
+{
+  return QSqlQuery();
 }

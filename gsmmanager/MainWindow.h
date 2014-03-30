@@ -28,6 +28,7 @@ protected:
   void changeEvent(QEvent *e);
 
   QList<IView *> createViews();
+  void removeViews(QTabWidget* container);
 
 protected slots:
   void containerDestroyed(QObject * obj);
