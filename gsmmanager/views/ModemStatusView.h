@@ -28,6 +28,8 @@ public:
 
   QString name();
 
+  bool event(QEvent * e);
+
 public slots:
 
 
@@ -42,6 +44,10 @@ private:
 
 private slots:
   void updateStatus();
+  void updateManufacturerInfo(const QString &info);
+  void updateRevisionInfo(const QString &info);
+  void updateModelInfo(const QString &info);
+  void updateSerialNumberInfo(const QString &info);
 
 private:
   Ui::ModemStatusView *ui;

@@ -70,6 +70,7 @@
     <property name="title">
      <string>File</string>
     </property>
+    <addaction name="actionUpdate"/>
     <addaction name="actionExit"/>
    </widget>
    <addaction name="menuFile"/>
@@ -78,6 +79,11 @@
   <action name="actionExit">
    <property name="text">
     <string>Exit</string>
+   </property>
+  </action>
+  <action name="actionUpdate">
+   <property name="text">
+    <string>Update</string>
    </property>
   </action>
  </widget>

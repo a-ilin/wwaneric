@@ -1,6 +1,9 @@
 ﻿#include "UssdView.h"
 #include "ui_UssdView.h"
 
+#include "../Core.h"
+#include "../Modem.h"
+
 #include <QContextMenuEvent>
 #include <QKeyEvent>
 #include <QMenu>
@@ -84,7 +87,47 @@ QString UssdView::name()
 
 void UssdView::sendUssd(const QString &ussd)
 {
+//  ui->ussdAnswer->appendPlainText(tr("Sent: ") + ussd);
 
+//  Modem * modem = Core::instance()->modem();
+//  USSD_STATUS receivedStatus;
+
+//  QString answer = modem->sendUssd(ussd, &receivedStatus);
+
+//  receivedModemUssd(answer, receivedStatus);
+}
+
+void UssdView::receivedModemUssd(const QString &ussdAnswer, USSD_STATUS status)
+{
+  ui->ussdAnswer->appendPlainText(tr("Received: ") + ussdAnswer);
+
+  QString statusStr;
+
+  switch(status)
+  {
+  case USSD_STATUS_FINISHED:
+    statusStr = tr("USSD session: finished.");
+    break;
+  case USSD_STATUS_USER_ACTION_NEEDED:
+    statusStr = tr("USSD session: active.");
+    break;
+  case USSD_STATUS_DIALOGUE_TERMINATED:
+    statusStr = tr("USSD session: terminated.");
+    break;
+  case USSD_STATUS_OTHER_IO_RESPONDED:
+    statusStr = tr("USSD session: other client responded.");
+    break;
+  case USSD_STATUS_OPERATION_NOT_SUPPORTED:
+    statusStr = tr("USSD session: operation not supported.");
+    break;
+  case USSD_STATUS_NETWORK_TIMEOUT:
+    statusStr = tr("USSD session: network time out.");
+    break;
+  default:
+    statusStr = tr("USSD session: unknown.");
+  }
+
+  ui->labelSessionStatus->setText(statusStr);
 }
 
 void UssdView::updateUssd(const QList<Ussd> &ussdList)

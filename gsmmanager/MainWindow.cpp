@@ -1,6 +1,7 @@
 ﻿#include "MainWindow.h"
 #include "ui_MainWindow.h"
 
+#include "Modem.h"
 #include "Settings.h"
 
 #include "IView.h"
@@ -17,6 +18,7 @@ MainWindow::MainWindow(QWidget *parent) :
   ui(new Ui::MainWindow)
 {
   ui->setupUi(this);
+  connect(ui->actionUpdate, SIGNAL(triggered()), this, SLOT(updateActionTriggered()));
 }
 
 MainWindow::~MainWindow()
@@ -139,5 +141,21 @@ void MainWindow::containerDestroyed(QObject *obj)
   }
 
   removeViews(container);
+}
+
+void MainWindow::updateActionTriggered()
+{
+  MapViews::const_iterator iter = m_views.constBegin();
+  MapViews::const_iterator iterEnd = m_views.constEnd();
+
+  while(iter != iterEnd)
+  {
+    IView * view = iter.value();
+    QEvent * event = new QEvent(ModemEventType);
+
+    QCoreApplication::postEvent(view->widget(), event);
+
+    ++iter;
+  }
 }
 

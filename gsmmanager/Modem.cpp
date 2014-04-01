@@ -2,267 +2,285 @@
 
 #include "common.h"
 
-#include <QtSerialPort/QSerialPort>
+#include <QTimer>
+
+QEvent::Type ModemEventType = (QEvent::Type)QEvent::registerEventType();
 
 
-#define RS232_IO_DELAY_MS 250
-#define RS232_IO_RETRIES 1
+QList<Conversation> parse(const QByteArray &answer, int &unparsedRestSize)
+{
+  // split by \r\n
+  const QByteArray phraseSep("\r\n");
+  QList<QByteArray> splitted = splitByteArray(answer, phraseSep, KeepSeparators);
 
+  QList<Conversation> conversations;
+
+  unparsedRestSize = 0;
+
+  // split by OK or ERROR
+  if(splitted.size() > 0)
+  {
+    Conversation conversation;
+
+    foreach(const QByteArray & array, splitted)
+    {
+      unparsedRestSize += array.size();
+
+      const QString arrayStr(array);
+
+      if ( (arrayStr == QString("OK")) || (arrayStr == QString("ERROR")) )
+      {
+        conversation.append(array);
+
+        // detect echo reply (enabled by default or ATE1)
+        {
+          QByteArray & first = conversation.first();
+
+          int posCr = first.indexOf('\r');
+          if (posCr != -1)
+          {
+            QByteArray echoReply(first.constData(), posCr);
+
+            if (first.size() > posCr + 1)
+            {
+              first.remove(0, posCr + 1);
+            }
+            else // first.size() == posCr + 1
+            {
+              conversation.takeFirst();
+            }
+
+            conversation.prepend(echoReply);
+          }
+        }
+
+        conversations.append(conversation);
+        conversation.clear();
+        unparsedRestSize = 0;
+      }
+      else if (array != phraseSep)
+      {
+        conversation.append(array);
+      }
+    }
+
+    // eat last separator
+    if ((!conversation.size()) && (unparsedRestSize == phraseSep.size()))
+    {
+      unparsedRestSize = 0;
+    }
+  }
+
+  return conversations;
+}
 
 
 Modem::Modem() :
   QObject(),
-  m_batchQueryStarted(false),
-  m_portTested(false)
+  m_modemStatus(MODEM_STATUS_READY),
+  m_modemDetected(false)
 {
-  m_serialPort = new QSerialPort();
-  unsetLogFunction();
+  m_timerTimeout = new QTimer(this);
+  m_timerTimeout->setSingleShot(true);
+  m_timerTimeout->setInterval(1500);  // device timeout
+  connect(m_timerTimeout, SIGNAL(timeout()), this, SLOT(onTimerTimeout()));
+
+  m_timerRequestProcessor = new QTimer(this);
+  m_timerRequestProcessor->setInterval(100);  // request processing frequency
+  connect(m_timerRequestProcessor, SIGNAL(timeout()), this, SLOT(onTimerRequestProcessor()));
+
+  m_serialPort = new QSerialPort(this);
+  connect(m_serialPort, SIGNAL(readyRead()), SLOT(onReadyRead()));
+  connect(m_serialPort, SIGNAL(error(QSerialPort::SerialPortError)),
+          SLOT(onError(QSerialPort::SerialPortError)));
+
+  connect(m_serialPort, SIGNAL(readChannelFinished()), SLOT(onReadChannelFinished()));
 }
 
 Modem::~Modem()
 {
-  endBatchQuery();
-  delete m_serialPort;
+
 }
 
-void Modem::setLogFunction(void(*logFunction)(const QString &))
+void Modem::setPortName(const QString &portName)
 {
-  this->logFunction = logFunction;
+  m_serialPort->setPortName(portName);
 }
 
-void Modem::unsetLogFunction()
+void Modem::openPort()
 {
-  this->logFunction = &dummyLogFunction;
-}
-
-void Modem::dummyLogFunction(const QString &text)
-{
-  Q_LOGEX(LOG_VERBOSE_RAW, text);
-}
-
-void Modem::setSerialPortName(const QString &serialPortName)
-{
-  m_serialPort->setPortName(serialPortName);
-
-  if(testModem())
+  // if port opened but modem not found
+  if ((!m_modemDetected) && m_serialPort->isOpen())
   {
-    emit modemNotification(MODEM_NOTIFICATION_PORT);
-  }
-}
-
-bool Modem::openSerialPort()
-{
-  if (m_batchQueryStarted)
-  {
-    return true;
-  }
-
-  if (m_serialPort->open(QIODevice::ReadWrite))
-  {
-    m_serialPort->setBaudRate(QSerialPort::Baud115200);
-    m_serialPort->setDataBits(QSerialPort::Data8);
-    m_serialPort->setFlowControl(QSerialPort::NoFlowControl);
-    m_serialPort->setParity(QSerialPort::NoParity);
-    m_serialPort->setStopBits(QSerialPort::OneStop);
-
-    bool result = true;
-    sendToSerialPort(QString("\r\n"));
-    QString answer = readLineFromSerialPort();
-
-    // if wireless device is ready
-    if (answer.contains(QString("*EMRDY: 1")))
-    {
-      // switch off echo
-      sendToSerialPort(QString("ATE0\r\n"));
-
-      // clear output buffer
-      readAllRawFromSerialPort();
-
-      result = true;
-    }
-    else
-    {
-      m_serialPort->close();
-      result = false;
-    }
-
-    return result;
-  }
-
-  return false;
-}
-
-void Modem::closeSerialPort()
-{
-  if (m_batchQueryStarted)
-  {
-    return;
-  }
-
-  m_serialPort->close();
-}
-
-void Modem::sendToSerialPort(const QString str)
-{
-  m_serialPort->write(str.toLatin1().constData());
-  while(m_serialPort->waitForBytesWritten(RS232_IO_DELAY_MS));
-  logFunction(QString("Written:\n"+str));
-}
-
-QString Modem::readLineFromSerialPort()
-{
-  int retries = RS232_IO_RETRIES;
-  QString result("");
-
-  while( retries > 0 )
-  {
-    if(!m_serialPort->waitForReadyRead(RS232_IO_DELAY_MS))
-    {
-      retries--;
-      continue;
-    }
-
-    result = m_serialPort->readAll();
-    if (result.isEmpty())
-    {
-      continue;
-    }
-
-    break;
-  }
-
-  result = result.remove(QChar('\r'));
-  result = result.remove(QChar('\n'));
-
-  logFunction(QString("Read:\n"+result));
-  return result;
-}
-
-QStringList Modem::readAllFromSerialPort()
-{
-  QStringList result;
-  QString currentLine = readLineFromSerialPort();
-
-  while(!currentLine.isEmpty())
-  {
-    result.append(currentLine);
-    currentLine = readLineFromSerialPort();
-  }
-
-  return result;
-}
-
-QString Modem::readAllRawFromSerialPort()
-{
-  while(m_serialPort->waitForReadyRead(RS232_IO_DELAY_MS));
-
-  QString str(m_serialPort->readAll());
-  logFunction(QString("Read:\n"+str));
-  return str;
-}
-
-inline bool Modem::decodeCommandExecStatus(QString statusString)
-{
-  static const QString ok = "OK";
-  if (statusString != ok)
-  {
-    return false;
-  }
-
-  return true;
-}
-
-bool Modem::testModem()
-{
-  if (m_batchQueryStarted)
-  {
-    return true;
-  }
-
-  if (openSerialPort())
-  {
-    m_portTested = true;
     m_serialPort->close();
-    return true;
   }
 
-  m_portTested = false;
-  return false;
-}
-
-bool Modem::storageCapacityUsed(int *simUsed, int *simTotal, int *phoneUsed, int *phoneTotal)
-{
-  if (openSerialPort())
+  if (!m_serialPort->isOpen())
   {
-    sendToSerialPort(QString("AT+CPMS?\r\n"));
-    QString answer = readLineFromSerialPort();
+    // clear buffers, etc...
+    closePort();
 
-    if (!decodeCommandExecStatus(readLineFromSerialPort()))
+    m_serialPort->open(QIODevice::ReadWrite);
+
+    QSerialPort::SerialPortError errorCode = m_serialPort->error();
+
+    if (errorCode != QSerialPort::NoError)
     {
-      closeSerialPort();
-      return false;
+      emit updatedPortError(errorCode);
+      emit updatedPortError(m_serialPort->errorString());
+      m_serialPort->clearError();
     }
 
-    QStringList answerParts = parseModemAnswer(answer, QString(","), QString("+CPMS:"));
-
-    bool success = true;
-
-    if (answerParts.at(0) == QString("\"ME\""))
+    if (m_serialPort->isOpen())
     {
-      *phoneUsed = answerParts.at(1).toInt();
-      *phoneTotal = answerParts.at(2).toInt();
-    }
-    else if (answerParts.at(0) == QString("\"SM\""))
-    {
-      *simUsed = answerParts.at(1).toInt();
-      *simTotal = answerParts.at(2).toInt();
+      sendRequest("AT");
     }
     else
     {
-      logFunction("Cannot parse answer part 1 of command \"AT+CPMS?\"!");
-      success = false;
+      closePort();
     }
-
-    if (answerParts.at(3) == QString("\"ME\""))
-    {
-      *phoneUsed = answerParts.at(4).toInt();
-      *phoneTotal = answerParts.at(5).toInt();
-    }
-    else if (answerParts.at(3) == QString("\"SM\""))
-    {
-      *simUsed = answerParts.at(4).toInt();
-      *simTotal = answerParts.at(5).toInt();
-    }
-    else
-    {
-      logFunction("Cannot parse answer part 2 of command \"AT+CPMS?\"!");
-      success = false;
-    }
-
-    if (answerParts.at(6) == QString("\"ME\""))
-    {
-      *phoneUsed = answerParts.at(7).toInt();
-      *phoneTotal = answerParts.at(8).toInt();
-    }
-    else if (answerParts.at(6) == QString("\"SM\""))
-    {
-      *simUsed = answerParts.at(7).toInt();
-      *simTotal = answerParts.at(8).toInt();
-    }
-    else
-    {
-      logFunction("Cannot parse answer part 3 of command \"AT+CPMS?\"!");
-      success = false;
-    }
-
-    closeSerialPort();
-    return success;
-
   }
-
-  return false;
 }
 
+void Modem::closePort()
+{
+  if (m_serialPort->isOpen())
+  {
+    m_serialPort->close();
+    m_serialPort->clear();
+  }
+
+  m_timerRequestProcessor->stop();
+  m_timerTimeout->stop();
+
+  m_requestsToSend.clear();
+  m_bufferReceived.clear();
+
+  emit updatedPortStatus(false);
+
+  m_modemStatus = MODEM_STATUS_READY;
+  m_modemDetected = false;
+}
+
+void Modem::onReadyRead()
+{
+  m_timerTimeout->stop();
+
+  QByteArray data = m_serialPort->readAll();
+  m_bufferReceived.append(data);
+
+  // debug logging
+  {
+    QString hexString;
+    for(int i=0; i< data.size(); ++i)
+    {
+      hexString += QString::number(data.constData()[i], 16) + QChar(' ');
+    }
+
+    QString debugString(QString("Read:\nHEX: ") + hexString + QChar('\n') + QString(data));
+
+    Q_LOGEX(LOG_VERBOSE_DEBUG, debugString);
+  }
+
+  if (!parseBuffer())
+  {
+    m_timerTimeout->start();
+  }
+}
+
+void Modem::onError(QSerialPort::SerialPortError errorCode)
+{
+  if (errorCode != QSerialPort::NoError)
+  {
+    QString errMsg(QString("Serial port error: %1. Description: %2")
+                   .arg(errorCode)
+                   .arg(m_serialPort->errorString()));
+
+    Q_LOGEX(LOG_VERBOSE_ERROR, errMsg);
+
+    emit updatedPortError(errorCode);
+    emit updatedPortError(m_serialPort->errorString());
+    m_serialPort->clearError();
+
+    if (!m_serialPort->isOpen())
+    {
+      closePort();
+    }
+  }
+}
+
+void Modem::onReadChannelFinished()
+{
+  Q_LOGEX(LOG_VERBOSE_DEBUG, QString("onReadChannelFinished called"));
+}
+
+void Modem::onTimerTimeout()
+{
+  Q_LOGEX(LOG_VERBOSE_ERROR, QString("Request timeout. Clearing data buffer."));
+
+  m_bufferReceived.clear();
+  m_modemStatus = MODEM_STATUS_READY;
+
+  if ((!m_serialPort->isOpen()) || (!m_modemDetected))
+  {
+    // clearing buffer, etc...
+    closePort();
+  }
+}
+
+void Modem::onTimerRequestProcessor()
+{
+  if (m_modemStatus != MODEM_STATUS_BUSY)
+  {
+    if (m_requestsToSend.size() > 0)
+    {
+      // rotate request
+      QByteArray request = m_requestsToSend.takeFirst();
+      m_requestsToSend.append(request);
+
+      request.append("\r\n");
+      sendToPort(request);
+      m_modemStatus = MODEM_STATUS_BUSY;
+
+      if (!m_timerTimeout->isActive())
+      {
+        m_timerTimeout->start();
+      }
+    }
+  }
+}
+
+void Modem::sendToPort(const QByteArray &data)
+{
+  // debug logging
+  {
+    QString hexString;
+    for(int i=0; i< data.size(); ++i)
+    {
+      hexString += QString::number(data.constData()[i], 16) + QChar(' ');
+    }
+
+    QString debugString(QString("Write:\nHEX: ") + hexString + QChar('\n') + QString(data));
+
+    Q_LOGEX(LOG_VERBOSE_DEBUG, debugString);
+  }
+
+  qint64 bytesWritten = m_serialPort->write(data);
+
+  if (bytesWritten != data.size())
+  {
+    Q_LOGEX(LOG_VERBOSE_ERROR, QString("Written %1 bytes of %2.").arg(bytesWritten).arg(data.size()));
+  }
+}
+
+void Modem::sendRequest(const QByteArray &request)
+{
+  m_requestsToSend.append(request);
+  if (!m_timerRequestProcessor->isActive())
+  {
+    m_timerRequestProcessor->start();
+  }
+}
 
 QStringList Modem::parseModemAnswer(const QString &inputText,
                                     const QString &splitter,
@@ -303,205 +321,209 @@ QStringList Modem::parseModemAnswer(const QString &inputText,
   return result;
 }
 
-bool Modem::selectPreferredSmsStorage(SMS_STORAGE storage)
+bool Modem::parseBuffer()
 {
-  if (m_serialPort->isOpen())
+  int restSize = 0;
+  const QList<Conversation> conversations = parse(m_bufferReceived, restSize);
+  if (restSize)
   {
-    // change current storage
-    QString selectedStorage;
-    if (storage == SMS_STORAGE_PHONE)
+    m_bufferReceived.remove(0, m_bufferReceived.size() - restSize);
+  }
+  else
+  {
+    m_bufferReceived.clear();
+  }
+
+  if (m_modemStatus == MODEM_STATUS_READY)
+  {
+    QString str = QString("Modem status is READY when new data arrived. Clearing data buffer.");
+    Q_LOGEX(LOG_VERBOSE_WARNING, str);
+    m_bufferReceived.clear();
+  }
+  else
+  {
+    foreach(const Conversation &c, conversations)
     {
-      selectedStorage = "\"ME\"";
+      // the first is the echo reply
+      // the last is the status OK/ERROR
+      if (c.size() >= 2)
+      {
+        QByteArray request(c.first());
+        QByteArray status(c.last());
+
+        if (status != "OK")
+        {
+          if (status == "ERROR")
+          {
+            QString str = QString("Received ERROR status for request %1")
+                          .arg(QString(request));
+            Q_LOGEX(LOG_VERBOSE_ERROR, str);
+          }
+          else
+          {
+            QString str = QString("Received unknown status %1 for request %2")
+                          .arg(QString(status)).arg(QString(request));
+            Q_LOGEX(LOG_VERBOSE_ERROR, str);
+          }
+
+          continue;
+        }
+
+        if ((request == "*EMRDY: 1") || (request == "AT"))
+        {
+          if (m_modemDetected)
+          {
+            Q_LOGEX(LOG_VERBOSE_WARNING, "Received READY while modem was already detected.");
+          }
+
+          m_modemStatus = MODEM_STATUS_READY;
+          m_requestsToSend.removeAll("AT");
+          m_modemDetected = true;
+          emit updatedPortStatus(true);
+        }
+        else if (m_modemDetected)
+        {
+          if (processConversation(c))
+          {
+            m_modemStatus = MODEM_STATUS_READY;
+            m_requestsToSend.removeAll(request);
+          }
+        }
+        else
+        {
+          QString err = QString("Received request %1 but modem was not detected!")
+                        .arg(QString(request));
+          Q_LOGEX(LOG_VERBOSE_ERROR, err);
+        }
+      }
+      else
+      {
+        QString str = QString("Received request size is too small: %1").arg(c.size());
+        Q_LOGEX(LOG_VERBOSE_WARNING, str);
+      }
+    }
+  }
+
+  if (m_modemStatus == MODEM_STATUS_READY)
+  {
+    if (m_bufferReceived.size() > 0)
+    {
+      QString str = QString("Request processed but unneeded data found. Clearing buffer. Data: ")
+                    .arg(QString(m_bufferReceived));
+      Q_LOGEX(LOG_VERBOSE_WARNING, str);
+
+      m_bufferReceived.clear();
+    }
+  }
+
+  return m_modemDetected && (m_modemStatus == MODEM_STATUS_READY);
+}
+
+bool Modem::processConversation(const Conversation &c)
+{
+  if (c.size() >= 2)
+  {
+    QByteArray request(c.first());
+
+    // echo reply has \r at the end
+    if (request.at(request.size() - 1) == '\r')
+    {
+      request.remove(request.size() - 2, 1);
+    }
+
+    /* QByteArray status(c.last()); */
+
+    if (request == "AT+CGMI")
+    {
+      emit updatedManufacturerInfo(c.at(1));
+      return true;
+    }
+    else if (request == "AT+CGMM")
+    {
+      emit updatedModelInfo(c.at(1));
+      return true;
+    }
+    else if (request == "AT+CGSN")
+    {
+      emit updatedSerialNumberInfo(c.at(1));
+      return true;
+    }
+    else if (request == "AT+CGMR")
+    {
+      emit updatedRevisionInfo(c.at(1));
+      return true;
     }
     else
     {
-      selectedStorage = "\"SM\"";
+      QString str = QString("Unknown request received: %1").arg(QString(request));
+      Q_LOGEX(LOG_VERBOSE_WARNING, str);
     }
-    sendToSerialPort(QString("AT+CPMS=%1\r\n").arg(selectedStorage));
-    readLineFromSerialPort(); // status of storage capacity
-    if (!decodeCommandExecStatus(readLineFromSerialPort()))
-    {
-      return false;
-    }
-
-    return true;
   }
 
   return false;
 }
 
-QList<Sms> Modem::readSms(SMS_STORAGE storage, SMS_STATUS status)
+
+
+/*
+ * Some static information
+ *
+*/
+void Modem::updateManufacturerInfo()
 {
-  QList<Sms> result;
-
-  if (openSerialPort())
-  {
-    // change current storage
-    if (!selectPreferredSmsStorage(storage))
-    {
-      closeSerialPort();
-      return result;
-    }
-
-    // read messages
-    sendToSerialPort(QString("AT+CMGL=%1\r\n").arg(QString::number(status)));
-
-    QStringList answer = readAllFromSerialPort();
-
-    // Every message takes two string.
-    // Also the status string placed at the end.
-    int messagesCount = (answer.length() - 1) / 2;
-
-    if (!decodeCommandExecStatus(answer.at(answer.length() - 1)))
-    {
-      closeSerialPort();
-      return result;
-    }
-
-    for (int i=0; i< messagesCount; i++)
-    {
-      // decode header
-      QStringList answerParts = parseModemAnswer(answer.at(i*2), QString(","), QString("+CMGL:"));
-
-      QByteArray pduData = answer.at((i*2)+1).toLatin1();
-
-      Sms newSms(storage,
-                 (SMS_STATUS)answerParts.at(1).toInt(),
-                 answerParts.at(0).toInt(),
-                 pduData);
-
-      if (!newSms.isValid())
-      {
-        logFunction(tr("PDU parsing error: %1\n").arg(newSms.parseError()));
-      }
-
-      //place into result
-      result.append(newSms);
-    }
-  }
-
-  closeSerialPort();
-
-  return result;
+  sendRequest("AT+CGMI");
 }
 
-bool Modem::deleteSms(SMS_STORAGE storage, int index)
+void Modem::updateModelInfo()
 {
-  bool result = false;
-
-  if (openSerialPort())
-  {
-    // change current storage
-    if (selectPreferredSmsStorage(storage))
-    {
-      sendToSerialPort(QString("AT+CMGD=%1,0\r\n").arg(index));
-      //readLineFromSerialPort();
-
-      if (decodeCommandExecStatus(readLineFromSerialPort()))
-      {
-        result = true;
-      }
-    }
-
-    closeSerialPort();
-  }
-
-  return result;
+  sendRequest("AT+CGMM");
 }
 
-bool Modem::startBatchQuery()
+void Modem::updateSerialNumberInfo()
 {
-  if (openSerialPort())
-  {
-    m_batchQueryStarted = true;
-    return true;
-  }
-
-  return false;
+  sendRequest("AT+CGSN");
 }
 
-void Modem::endBatchQuery()
+void Modem::updateRevisionInfo()
 {
-  m_batchQueryStarted = false;
-  closeSerialPort();
+  sendRequest("AT+CGMR");
 }
 
-QString Modem::manufacturerInfo()
+/*
+ * SMS
+ *
+*/
+
+void Modem::updateSms(SMS_STORAGE storage, SMS_STATUS status)
 {
-  QString result;
 
-  if (openSerialPort())
-  {
-    sendToSerialPort(QString("AT+CGMI\r\n"));
-    result = readLineFromSerialPort();
-
-    if (!decodeCommandExecStatus(readLineFromSerialPort()))
-    {
-      closeSerialPort();
-      return QString();
-    }
-  }
-
-  closeSerialPort();
-  return result;
 }
 
-QString Modem::modelInfo()
+void Modem::updateSmsCapacity()
 {
-  QString result;
 
-  if (openSerialPort())
-  {
-    sendToSerialPort(QString("AT+CGMM\r\n"));
-    result = readLineFromSerialPort();
-
-    if (!decodeCommandExecStatus(readLineFromSerialPort()))
-    {
-      closeSerialPort();
-      return QString();
-    }
-  }
-
-  closeSerialPort();
-  return result;
 }
 
-QString Modem::serialNumberInfo()
+void Modem::sendSms(const Sms &sms)
 {
-  QString result;
 
-  if (openSerialPort())
-  {
-    sendToSerialPort(QString("AT+CGSN\r\n"));
-    result = readLineFromSerialPort();
-
-    if (!decodeCommandExecStatus(readLineFromSerialPort()))
-    {
-      closeSerialPort();
-      return QString();
-    }
-  }
-
-  closeSerialPort();
-  return result;
 }
 
-QString Modem::revisionInfo()
+void Modem::deleteSms(SMS_STORAGE storage, int index)
 {
-  QString result;
 
-  if (openSerialPort())
-  {
-    sendToSerialPort(QString("AT+CGMR\r\n"));
-    result = readLineFromSerialPort();
-
-    if (!decodeCommandExecStatus(readLineFromSerialPort()))
-    {
-      closeSerialPort();
-      return QString();
-    }
-  }
-
-  closeSerialPort();
-  return result;
 }
+
+/*
+ * USSD
+ *
+*/
+
+void Modem::sendUssd(const QString &ussd, USSD_SEND_STATUS status)
+{
+
+}
+
+
+
+

@@ -30,6 +30,7 @@ public:
 
 public slots:
   void sendUssd(const QString &ussd);
+  void receivedModemUssd(const QString &ussdAnswer, USSD_STATUS status);
 
 protected:
   void changeEvent(QEvent *e);

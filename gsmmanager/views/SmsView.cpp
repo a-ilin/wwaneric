@@ -39,9 +39,9 @@ void SmsView::changeEvent(QEvent *e)
 
 void SmsView::init()
 {
-  Modem * modem = Core::instance()->modem();
-  connect(modem, SIGNAL(modemNotification(MODEM_NOTIFICATION_TYPE)),
-          this, SLOT(updateSmsFromModem()));
+//  Modem * modem = Core::instance()->modem();
+//  connect(modem, SIGNAL(modemNotification(MODEM_NOTIFICATION_TYPE)),
+//          this, SLOT(updateSmsFromModem()));
 }
 
 void SmsView::tini()
@@ -70,34 +70,34 @@ QString SmsView::name()
 
 void SmsView::smsContextMenuRequested(const QPoint &pos)
 {
-  QListWidget * lw = qobject_cast<QListWidget *> (sender());
-  Q_ASSERT(lw);
+//  QListWidget * lw = qobject_cast<QListWidget *> (sender());
+//  Q_ASSERT(lw);
 
-  QModelIndex index = lw->indexAt(pos);
-  QListWidgetItem * item = lw->itemAt(pos);
-  Sms sms = index.data(Qt::UserRole).value<Sms>();
+//  QModelIndex index = lw->indexAt(pos);
+//  QListWidgetItem * item = lw->itemAt(pos);
+//  Sms sms = index.data(Qt::UserRole).value<Sms>();
 
-  // construct menu
-  QMenu *menu = new QMenu(this);
-  QAction deleteSms("Delete SMS", this);
-  if(!index.isValid())
-  {
-    deleteSms.setEnabled(false);
-  }
+//  // construct menu
+//  QMenu *menu = new QMenu(this);
+//  QAction deleteSms("Delete SMS", this);
+//  if(!index.isValid())
+//  {
+//    deleteSms.setEnabled(false);
+//  }
 
-  menu->addAction(&deleteSms);
-  QAction *executed = menu->exec(lw->viewport()->mapToGlobal(pos));
+//  menu->addAction(&deleteSms);
+//  QAction *executed = menu->exec(lw->viewport()->mapToGlobal(pos));
 
 
 
-  if (executed == &deleteSms)
-  {
-    bool result = Core::instance()->modem()->deleteSms(sms.storage(), sms.index());
-    if(result)
-    {
-      delete lw->takeItem(index.row());
-    }
-  }
+//  if (executed == &deleteSms)
+//  {
+//    bool result = Core::instance()->modem()->deleteSms(sms.storage(), sms.index());
+//    if(result)
+//    {
+//      delete lw->takeItem(index.row());
+//    }
+//  }
 }
 
 void SmsView::fillSmsTextAndTooltip(Sms * sms, QString * smsText, QString * smsTooltip) const
@@ -118,56 +118,56 @@ void SmsView::fillSmsTextAndTooltip(Sms * sms, QString * smsText, QString * smsT
 
 void SmsView::updateSmsFromModem()
 {
-  // SMS storage status
-  int simUsed = 0;
-  int simTotal = 0;
-  int phoneUsed = 0;
-  int phoneTotal = 0;
+//  // SMS storage status
+//  int simUsed = 0;
+//  int simTotal = 0;
+//  int phoneUsed = 0;
+//  int phoneTotal = 0;
 
-  Modem * modem = Core::instance()->modem();
+//  Modem * modem = Core::instance()->modem();
 
-  modem->storageCapacityUsed(&simUsed, &simTotal, &phoneUsed, &phoneTotal);
+//  modem->storageCapacityUsed(&simUsed, &simTotal, &phoneUsed, &phoneTotal);
 
-  ui->labelSmsStorageCapacitySIMValue->setText(QString::number(simUsed) +
-                                               QString("/") +
-                                               QString::number(simTotal));
+//  ui->labelSmsStorageCapacitySIMValue->setText(QString::number(simUsed) +
+//                                               QString("/") +
+//                                               QString::number(simTotal));
 
-  ui->labelSmsStorageCapacityPhoneValue->setText(QString::number(phoneUsed) +
-                                                 QString("/") +
-                                                 QString::number(phoneTotal));
+//  ui->labelSmsStorageCapacityPhoneValue->setText(QString::number(phoneUsed) +
+//                                                 QString("/") +
+//                                                 QString::number(phoneTotal));
 
-  // clear SMS widgets
-  ui->lwSmsIncome->clear();
-  ui->lwSmsDrafts->clear();
-  ui->lwSmsSend->clear();
+//  // clear SMS widgets
+//  ui->lwSmsIncome->clear();
+//  ui->lwSmsDrafts->clear();
+//  ui->lwSmsSend->clear();
 
 
-  QList<Sms> smsList;
+//  QList<Sms> smsList;
 
-  // SMS new read from SIM and phone
-  smsList.append(modem->readSms(SMS_STORAGE_SIM, SMS_STATUS_NEW));
-  smsList.append(modem->readSms(SMS_STORAGE_PHONE, SMS_STATUS_NEW));
+//  // SMS new read from SIM and phone
+//  smsList.append(modem->readSms(SMS_STORAGE_SIM, SMS_STATUS_NEW));
+//  smsList.append(modem->readSms(SMS_STORAGE_PHONE, SMS_STATUS_NEW));
 
-  // SMS old read from SIM and phone
-  smsList.append(modem->readSms(SMS_STORAGE_SIM, SMS_STATUS_INCOME));
-  smsList.append(modem->readSms(SMS_STORAGE_PHONE, SMS_STATUS_INCOME));
+//  // SMS old read from SIM and phone
+//  smsList.append(modem->readSms(SMS_STORAGE_SIM, SMS_STATUS_INCOME));
+//  smsList.append(modem->readSms(SMS_STORAGE_PHONE, SMS_STATUS_INCOME));
 
-  // SMS drafts read from SIM and phone
-  smsList.append(modem->readSms(SMS_STORAGE_SIM, SMS_STATUS_DRAFT));
-  smsList.append(modem->readSms(SMS_STORAGE_PHONE, SMS_STATUS_DRAFT));
+//  // SMS drafts read from SIM and phone
+//  smsList.append(modem->readSms(SMS_STORAGE_SIM, SMS_STATUS_DRAFT));
+//  smsList.append(modem->readSms(SMS_STORAGE_PHONE, SMS_STATUS_DRAFT));
 
-  // SMS sent read from SIM and phone
-  smsList.append(modem->readSms(SMS_STORAGE_SIM, SMS_STATUS_SENT));
-  smsList.append(modem->readSms(SMS_STORAGE_PHONE, SMS_STATUS_SENT));
+//  // SMS sent read from SIM and phone
+//  smsList.append(modem->readSms(SMS_STORAGE_SIM, SMS_STATUS_SENT));
+//  smsList.append(modem->readSms(SMS_STORAGE_PHONE, SMS_STATUS_SENT));
 
-  // write to DB
-  SmsDatabaseEntity smsDb;
-  if (smsDb.init())
-  {
-    smsDb.insert(smsList);
-  }
+//  // write to DB
+//  SmsDatabaseEntity smsDb;
+//  if (smsDb.init())
+//  {
+//    smsDb.insert(smsList);
+//  }
 
-  updateSms(smsList);
+//  updateSms(smsList);
 }
 
 void SmsView::updateSms(const QList<Sms> &smsList)

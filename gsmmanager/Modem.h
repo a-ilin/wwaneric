@@ -1,21 +1,26 @@
 ﻿#ifndef MODEM_H
 #define MODEM_H
 
+#include <QEvent>
 #include <QObject>
+#include <QLinkedList>
 #include <QList>
+#include <QQueue>
+#include <QSet>
+#include <QtSerialPort/QSerialPort>
 #include <QStringList>
 
 #include "Sms.h"
+#include "Ussd.h"
+
+
+// an ID for QEvent object constructing
+extern QEvent::Type ModemEventType;
 
 class QSerialPort;
+class QTimer;
 
-enum MODEM_NOTIFICATION_TYPE
-{
-  MODEM_NOTIFICATION_PORT,
-  MODEM_NOTIFICATION_SMS,
-  MODEM_NOTIFICATION_USSD,
-  MODEM_NOTIFICATION_LAST
-};
+typedef QList<QByteArray> Conversation;
 
 class Modem : public QObject
 {
@@ -23,90 +28,134 @@ class Modem : public QObject
 
 public:
   Modem();
-  virtual ~Modem();
+  ~Modem();
 
-  void setSerialPortName(const QString &serialPortName);
+  QString portName() const { return m_serialPort->portName(); }
 
-  // test if modem works
-  bool testModem();
-
-  bool portTested() const { return m_portTested; }
+public slots:
 
   /*
-   * Communication speed up
+   * Connection information
    *
   */
-  // return true on success or false on fail
-  bool startBatchQuery();
-  void endBatchQuery();
-
+  void setPortName(const QString &portName);
+  void openPort();
+  void closePort();
 
   /*
    * Some static information
    *
   */
-  QString manufacturerInfo();
-  QString modelInfo();
-  QString serialNumberInfo();
-  QString revisionInfo();
+  void updateManufacturerInfo();
+  void updateModelInfo();
+  void updateSerialNumberInfo();
+  void updateRevisionInfo();
+
 
   /*
    * SMS
    *
   */
+  void updateSms(SMS_STORAGE storage, SMS_STATUS status);
+  void updateSmsCapacity();
 
-  QList<Sms> readSms(SMS_STORAGE storage, SMS_STATUS status);
-
-  // return true on success or false on fail
-  bool storageCapacityUsed(int *simUsed, int *simTotal, int *phoneUsed, int *phoneTotal);
-
-  bool deleteSms(SMS_STORAGE storage, int index);
+  void sendSms(const Sms& sms);
+  void deleteSms(SMS_STORAGE storage, int index);
 
   /*
-   * Logging
+   * USSD
    *
   */
-  void setLogFunction(void(*logFunction)(const QString&));
-  void unsetLogFunction();
+
+  void sendUssd(const QString &ussd, USSD_SEND_STATUS status);
+
 
 signals:
-  void modemNotification(MODEM_NOTIFICATION_TYPE type);
+
+  /*
+   * Connection information
+   *
+  */
+  void updatedPortStatus(bool opened);
+  void updatedPortError(QSerialPort::SerialPortError errorCode);
+  void updatedPortError(const QString& errorString);
+
+  /*
+   * Some static information
+   *
+  */
+  void updatedManufacturerInfo(const QString &info);
+  void updatedModelInfo(const QString &info);
+  void updatedSerialNumberInfo(const QString &info);
+  void updatedRevisionInfo(const QString &info);
+
+  /*
+   * SMS
+   *
+  */
+  void updatedSms(SMS_STORAGE storage, SMS_STATUS status, const QList<Sms> &smsList);
+  void updatedSmsCapacity(int simUsed, int simTotal, int phoneUsed, int phoneTotal);
+
+  /*
+   * USSD
+   *
+  */
+  void updatedUssd(const QString &ussd, USSD_STATUS status);
 
 private:
 
-  // console log function (for communication raw view)
-  void (*logFunction)(const QString &text);
-  static void dummyLogFunction(const QString &text);
+  // writes raw data to port
+  void sendToPort(const QByteArray &data);
+  // wrapper for sendToPort, adds request to set before calling sendToPort
+  void sendRequest(const QByteArray &request);
 
-  bool openSerialPort();
-  void closeSerialPort();
+  static QStringList parseModemAnswer(const QString &inputText,
+                                      const QString &splitter,
+                                      const QString &command);
 
-  void sendToSerialPort(const QString str);
-  QString readLineFromSerialPort();
-  QStringList readAllFromSerialPort();
-  QString readAllRawFromSerialPort();
-  inline bool decodeCommandExecStatus(QString statusString);
+  // return true if all requested data received and false otherwise
+  bool parseBuffer();
 
-  // Parse answer from modem (inputText) for arguments.
-  // If searched argument (command) is specified then
-  // only string contained it will be parsed.
-  // Splitter specifies delimiter between parsed elements.
-  QStringList parseModemAnswer(const QString &inputText,
-                               const QString &splitter,
-                               const QString &command=QString());
+  // return true if conversation was recognized and successfully processed
+  bool processConversation(const Conversation & c);
 
-
-  bool selectPreferredSmsStorage(SMS_STORAGE storage);
+private slots:
+  // reads data from port to buffer
+  void onReadyRead();
+  // error processing
+  void onError(QSerialPort::SerialPortError errorCode);
+  void onReadChannelFinished();
+  // connection timeout
+  void onTimerTimeout();
+  // request queue processing
+  void onTimerRequestProcessor();
 
 private:
+
+  enum MODEM_STATUS
+  {
+    MODEM_STATUS_READY,
+    MODEM_STATUS_BUSY
+  } m_modemStatus;
+
+  // modem detected on specified port
+  bool m_modemDetected;
+
   // interface to serial port communication
   QSerialPort * m_serialPort;
 
-  // when set to true serial port don't being opened and closed at each query
-  bool m_batchQueryStarted;
+  // received data buffer
+  QByteArray m_bufferReceived;
 
-  // true when port test is successful
-  bool m_portTested;
+  // set of requests to send to modem
+  typedef QLinkedList<QByteArray> Requests;
+  Requests m_requestsToSend;
+
+  // timer timeout
+  QTimer * m_timerTimeout;
+
+  // timer processes request set
+  QTimer * m_timerRequestProcessor;
 };
 
 #endif // MODEM_H

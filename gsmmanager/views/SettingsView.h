@@ -40,13 +40,12 @@ private:
 
 
 private slots:
-  void serialPortChanged(int newIndex);
-  void updatePortStatus();
+  void openPortClicked();
+  void closePortClicked();
+  void updatePortStatus(bool opened);
 
 private:
   Ui::SettingsView *ui;
-
-  QString m_serialPortName;
 
 };
 

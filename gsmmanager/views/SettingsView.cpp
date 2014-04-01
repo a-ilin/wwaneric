@@ -11,8 +11,10 @@ SettingsView::SettingsView(QWidget *parent) :
   ui(new Ui::SettingsView)
 {
   ui->setupUi(this);
+  ui->closeButton->setEnabled(false);
 
-  connect(ui->cbComPort, SIGNAL(currentIndexChanged(int)), this, SLOT(serialPortChanged(int)));
+  connect(ui->openButton, SIGNAL(clicked()), this, SLOT(openPortClicked()));
+  connect(ui->closeButton, SIGNAL(clicked()), this, SLOT(closePortClicked()));
 }
 
 SettingsView::~SettingsView()
@@ -36,8 +38,8 @@ void SettingsView::changeEvent(QEvent *e)
 void SettingsView::init()
 {
   Modem * modem = Core::instance()->modem();
-  connect(modem, SIGNAL(modemNotification(MODEM_NOTIFICATION_TYPE)),
-          this, SLOT(updatePortStatus()));
+  connect(modem, SIGNAL(updatedPortStatus(bool)),
+          this, SLOT(updatePortStatus(bool)));
 }
 
 void SettingsView::tini()
@@ -69,7 +71,8 @@ void SettingsView::restore(Settings &set)
 
 void SettingsView::store(Settings &set)
 {
-  set.setValue("SerialPort", m_serialPortName);
+  Modem * modem = Core::instance()->modem();
+  set.setValue("SerialPort", modem->portName());
 }
 
 QString SettingsView::name()
@@ -77,20 +80,33 @@ QString SettingsView::name()
   return tr("Settings");
 }
 
-void SettingsView::serialPortChanged(int newIndex)
+void SettingsView::openPortClicked()
 {
-  m_serialPortName = ui->cbComPort->itemData(newIndex).toString();
-  Core::instance()->modem()->setSerialPortName(m_serialPortName);
+  Modem * modem = Core::instance()->modem();
+  QString portName = ui->cbComPort->currentData().toString();
+
+  modem->setPortName(portName);
+  modem->openPort();
 }
 
-void SettingsView::updatePortStatus()
+void SettingsView::closePortClicked()
 {
-  if (Core::instance()->modem()->portTested())
+  Core::instance()->modem()->closePort();
+}
+
+void SettingsView::updatePortStatus(bool opened)
+{
+  Modem * modem = Core::instance()->modem();
+
+  if (opened)
   {
-    ui->labelComPortStatus->setText(tr("Modem status OK."));
+    ui->labelComPortStatus->setText(tr("Port %1 opened. Modem status OK.").arg(modem->portName()));
   }
   else
   {
-    ui->labelComPortStatus->setText(tr("Error accessing serial port!"));
+    ui->labelComPortStatus->setText(tr("Port %1 closed.").arg(modem->portName()));
   }
+
+  ui->openButton->setEnabled(!opened);
+  ui->closeButton->setEnabled(opened);
 }

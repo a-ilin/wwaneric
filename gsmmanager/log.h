@@ -69,10 +69,11 @@ void WriteLog(const wchar_t * message);
 // Q_MESSAGEFMT is a QString object
 #define Q_LOGEX(VERBOSITY,Q_MESSAGEFMT) \
   { \
-    wchar_t * array = new wchar_t[Q_MESSAGEFMT.size() + 1]; \
-    int size = Q_MESSAGEFMT.toWCharArray(array); \
-    array[size] = 0; \
-    LOGEX(VERBOSITY,array); \
+    QString _str(Q_MESSAGEFMT); \
+    wchar_t * _array = new wchar_t[_str.size() + 1]; \
+    int _size = _str.toWCharArray(_array); \
+    _array[_size] = 0; \
+    LOGEX(VERBOSITY, _array); \
   }
 #endif // QT_VERSION
 

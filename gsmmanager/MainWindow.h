@@ -32,6 +32,7 @@ protected:
 
 protected slots:
   void containerDestroyed(QObject * obj);
+  void updateActionTriggered();
 
 protected:
   Ui::MainWindow *ui;
@@ -39,7 +40,8 @@ protected:
   typedef QHash<QString, QTabWidget*> ContainerHash;
   ContainerHash m_boxes;
 
-  QMultiMap<QTabWidget*, IView*> m_views;
+  typedef QMultiMap<QTabWidget*, IView*> MapViews;
+  MapViews m_views;
 
 };
 

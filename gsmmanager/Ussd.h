@@ -3,6 +3,27 @@
 
 #include "Database.h"
 
+// from ST-Ericcsson docs
+enum USSD_STATUS
+{
+  USSD_STATUS_FINISHED                 = 0,
+  USSD_STATUS_USER_ACTION_NEEDED       = 1,
+  USSD_STATUS_DIALOGUE_TERMINATED      = 2,
+  USSD_STATUS_OTHER_IO_RESPONDED       = 3,
+  USSD_STATUS_OPERATION_NOT_SUPPORTED  = 4,
+  USSD_STATUS_NETWORK_TIMEOUT          = 5,
+  USSD_STATUS_LAST  // this value used to type conversion check only
+};
+
+enum USSD_SEND_STATUS
+{
+  USSD_SEND_STATUS_CODE_PRESENTATION_OFF = 0,
+  USSD_SEND_STATUS_CODE_PRESENTATION_ON  = 1,
+  USSD_SEND_STATUS_DIALOGUE_TERMINATE    = 2,
+  USSD_SEND_STATUS_LAST  // this value used to type conversion check only
+};
+
+
 struct Ussd
 {
   QString ussd;

@@ -42,7 +42,8 @@ SOURCES += \
     views/SettingsView.cpp \
     views/ModemStatusView.cpp \
     views/UssdView.cpp \
-    Ussd.cpp
+    Ussd.cpp \
+    common.cpp
 
 HEADERS  += \
     common.h \

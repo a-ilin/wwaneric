@@ -1,4 +1,4 @@
-/*
+﻿/*
 Copyright (C) 2010- Alexander Chudnovets <effractor@gmail.com>
 
 Based on SMS Server Tools 3
@@ -777,36 +777,38 @@ int PDU::convertFromUcs2ToUtf8()
 {
 	char* buf = (char*)malloc(m_message_len+4);
 
-	buf[1] = (char)0xFE;
-	buf[0] = (char)0xFF;
+	buf[0] = (char)0xFE;
+	buf[1] = (char)0xFF;
 	buf[m_message_len+2] = 0;
 	buf[m_message_len+3] = 0;
 
-	for (int i=0; i< m_message_len; i+=2)
-	{
-		buf[i+2] = m_message[i+1];
-		buf[i+3] = m_message[i];
-	}
+	memcpy(buf+2, m_message, m_message_len);
 
-	QByteArray qdata = QString::fromUtf16((ushort*)(buf), (int)(m_message_len+3)).toUtf8();
+	// including BOM but excluding null-terminator
+	int bufCharCount = m_message_len / 2 + 1;
+	QByteArray qdata (QString::fromUtf16((ushort*)(buf), bufCharCount).toUtf8());
+
+	free(buf);
+
 	int nCLenWide = qdata.size();
 
-	char* cbuf = (char*)malloc(nCLenWide+4);
+	char* cbuf = (char*)malloc(nCLenWide+5);
 
 	cbuf[0] = 0xEF;
 	cbuf[1] = 0xBB;
 	cbuf[2] = 0xBF;
 	memcpy(cbuf+3, qdata.constData(), nCLenWide);
-	cbuf[nCLenWide] = 0;
+	cbuf[nCLenWide+3] = 0;
+	cbuf[nCLenWide+4] = 0;
 
 	if (m_message)
+	{
 		free(m_message);
-
-	free(buf);
+	}
 
 	m_message = cbuf;
 
-	m_message_len = nCLenWide;
+	m_message_len = nCLenWide + 3;
 
 	return m_message_len;
 }
