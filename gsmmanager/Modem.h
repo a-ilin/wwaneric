@@ -108,6 +108,7 @@ private:
   void sendToPort(const QByteArray &data);
   // wrapper for sendToPort, adds request to set before calling sendToPort
   void sendRequest(const QByteArray &request);
+  void sendRequestFromQueue();
 
   static QStringList parseModemAnswer(const QString &inputText,
                                       const QString &splitter,
@@ -119,6 +120,8 @@ private:
   // return true if conversation was recognized and successfully processed
   bool processConversation(const Conversation & c);
 
+  void notifyError(QSerialPort::SerialPortError errorCode);
+
 private slots:
   // reads data from port to buffer
   void onReadyRead();
@@ -127,8 +130,6 @@ private slots:
   void onReadChannelFinished();
   // connection timeout
   void onTimerTimeout();
-  // request queue processing
-  void onTimerRequestProcessor();
 
 private:
 
@@ -153,9 +154,6 @@ private:
 
   // timer timeout
   QTimer * m_timerTimeout;
-
-  // timer processes request set
-  QTimer * m_timerRequestProcessor;
 };
 
 #endif // MODEM_H

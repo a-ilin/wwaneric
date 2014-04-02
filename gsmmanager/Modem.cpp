@@ -85,10 +85,6 @@ Modem::Modem() :
   m_timerTimeout->setInterval(1500);  // device timeout
   connect(m_timerTimeout, SIGNAL(timeout()), this, SLOT(onTimerTimeout()));
 
-  m_timerRequestProcessor = new QTimer(this);
-  m_timerRequestProcessor->setInterval(100);  // request processing frequency
-  connect(m_timerRequestProcessor, SIGNAL(timeout()), this, SLOT(onTimerRequestProcessor()));
-
   m_serialPort = new QSerialPort(this);
   connect(m_serialPort, SIGNAL(readyRead()), SLOT(onReadyRead()));
   connect(m_serialPort, SIGNAL(error(QSerialPort::SerialPortError)),
@@ -144,22 +140,23 @@ void Modem::openPort()
 
 void Modem::closePort()
 {
+  notifyError(m_serialPort->error());
+
   if (m_serialPort->isOpen())
   {
     m_serialPort->close();
     m_serialPort->clear();
   }
 
-  m_timerRequestProcessor->stop();
   m_timerTimeout->stop();
 
   m_requestsToSend.clear();
   m_bufferReceived.clear();
 
-  emit updatedPortStatus(false);
-
   m_modemStatus = MODEM_STATUS_READY;
   m_modemDetected = false;
+
+  emit updatedPortStatus(false);
 }
 
 void Modem::onReadyRead()
@@ -192,6 +189,19 @@ void Modem::onError(QSerialPort::SerialPortError errorCode)
 {
   if (errorCode != QSerialPort::NoError)
   {
+    notifyError(errorCode);
+
+    if (!m_serialPort->isOpen())
+    {
+      closePort();
+    }
+  }
+}
+
+void Modem::notifyError(QSerialPort::SerialPortError errorCode)
+{
+  if (errorCode != QSerialPort::NoError)
+  {
     QString errMsg(QString("Serial port error: %1. Description: %2")
                    .arg(errorCode)
                    .arg(m_serialPort->errorString()));
@@ -201,52 +211,29 @@ void Modem::onError(QSerialPort::SerialPortError errorCode)
     emit updatedPortError(errorCode);
     emit updatedPortError(m_serialPort->errorString());
     m_serialPort->clearError();
-
-    if (!m_serialPort->isOpen())
-    {
-      closePort();
-    }
   }
 }
 
 void Modem::onReadChannelFinished()
 {
-  Q_LOGEX(LOG_VERBOSE_DEBUG, QString("onReadChannelFinished called"));
+  Q_LOGEX(LOG_VERBOSE_DEBUG, "Port closed by device.");
+
+  closePort();
 }
 
 void Modem::onTimerTimeout()
 {
-  Q_LOGEX(LOG_VERBOSE_ERROR, QString("Request timeout. Clearing data buffer."));
+  Q_LOGEX(LOG_VERBOSE_ERROR, "Request timeout. Clearing data buffer.");
 
   m_bufferReceived.clear();
   m_modemStatus = MODEM_STATUS_READY;
+
+  sendRequestFromQueue();
 
   if ((!m_serialPort->isOpen()) || (!m_modemDetected))
   {
     // clearing buffer, etc...
     closePort();
-  }
-}
-
-void Modem::onTimerRequestProcessor()
-{
-  if (m_modemStatus != MODEM_STATUS_BUSY)
-  {
-    if (m_requestsToSend.size() > 0)
-    {
-      // rotate request
-      QByteArray request = m_requestsToSend.takeFirst();
-      m_requestsToSend.append(request);
-
-      request.append("\r\n");
-      sendToPort(request);
-      m_modemStatus = MODEM_STATUS_BUSY;
-
-      if (!m_timerTimeout->isActive())
-      {
-        m_timerTimeout->start();
-      }
-    }
   }
 }
 
@@ -271,14 +258,39 @@ void Modem::sendToPort(const QByteArray &data)
   {
     Q_LOGEX(LOG_VERBOSE_ERROR, QString("Written %1 bytes of %2.").arg(bytesWritten).arg(data.size()));
   }
+
+  Q_ASSERT(!m_timerTimeout->isActive());
+  m_timerTimeout->start();
 }
 
 void Modem::sendRequest(const QByteArray &request)
 {
-  m_requestsToSend.append(request);
-  if (!m_timerRequestProcessor->isActive())
+  if (m_serialPort->isOpen())
   {
-    m_timerRequestProcessor->start();
+    if (!m_requestsToSend.contains(request))
+    {
+      m_requestsToSend.append(request);
+    }
+
+    if ((m_modemStatus == MODEM_STATUS_READY) &&
+        (m_requestsToSend.size() > 0))
+    {
+      // rotate request
+      QByteArray request = m_requestsToSend.takeFirst();
+      m_requestsToSend.append(request);
+
+      request.append("\r\n");
+      sendToPort(request);
+      m_modemStatus = MODEM_STATUS_BUSY;
+    }
+  }
+}
+
+void Modem::sendRequestFromQueue()
+{
+  if (m_requestsToSend.size() > 0)
+  {
+    sendRequest(m_requestsToSend.takeFirst());
   }
 }
 
@@ -414,6 +426,8 @@ bool Modem::parseBuffer()
 
       m_bufferReceived.clear();
     }
+
+    sendRequestFromQueue();
   }
 
   return m_modemDetected && (m_modemStatus == MODEM_STATUS_READY);
