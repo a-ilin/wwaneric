@@ -30,6 +30,8 @@ public:
 
   QString name();
 
+  bool event(QEvent * e);
+
 public slots:
 
 
@@ -42,11 +44,12 @@ private:
   void fillSmsTextAndTooltip(Sms *sms, QString * smsText, QString * smsTooltip) const;
 
 private slots:
+  void updateStatus();
   void updateSmsFromModem();
-
   void updateSms(const QList<Sms> &smsList);
-
   void smsContextMenuRequested(const QPoint &pos);
+
+  void updateSmsCapacity(int simUsed, int simTotal, int phoneUsed, int phoneTotal);
 
 private:
   Ui::SmsView *ui;

@@ -37,11 +37,25 @@ void SmsView::changeEvent(QEvent *e)
   }
 }
 
+bool SmsView::event(QEvent *e)
+{
+  if (e->type() == ModemEventType)
+  {
+    updateStatus();
+    e->accept();
+    return true;
+  }
+  else
+  {
+    return QWidget::event(e);
+  }
+}
+
 void SmsView::init()
 {
-//  Modem * modem = Core::instance()->modem();
-//  connect(modem, SIGNAL(modemNotification(MODEM_NOTIFICATION_TYPE)),
-//          this, SLOT(updateSmsFromModem()));
+  Modem * modem = Core::instance()->modem();
+
+  connect(modem, SIGNAL(updatedManufacturerInfo(QString)), SLOT(updateManufacturerInfo(QString)));
 }
 
 void SmsView::tini()
@@ -70,34 +84,45 @@ QString SmsView::name()
 
 void SmsView::smsContextMenuRequested(const QPoint &pos)
 {
-//  QListWidget * lw = qobject_cast<QListWidget *> (sender());
-//  Q_ASSERT(lw);
+  QListWidget * lw = qobject_cast<QListWidget *> (sender());
+  Q_ASSERT(lw);
 
-//  QModelIndex index = lw->indexAt(pos);
-//  QListWidgetItem * item = lw->itemAt(pos);
-//  Sms sms = index.data(Qt::UserRole).value<Sms>();
+  QModelIndex index = lw->indexAt(pos);
+  QListWidgetItem * item = lw->itemAt(pos);
+  Sms sms = index.data(Qt::UserRole).value<Sms>();
 
-//  // construct menu
-//  QMenu *menu = new QMenu(this);
-//  QAction deleteSms("Delete SMS", this);
-//  if(!index.isValid())
-//  {
-//    deleteSms.setEnabled(false);
-//  }
+  // construct menu
+  QMenu *menu = new QMenu(this);
+  QAction deleteSms("Delete SMS", this);
+  if(!index.isValid())
+  {
+    deleteSms.setEnabled(false);
+  }
 
-//  menu->addAction(&deleteSms);
-//  QAction *executed = menu->exec(lw->viewport()->mapToGlobal(pos));
+  menu->addAction(&deleteSms);
+  QAction *executed = menu->exec(lw->viewport()->mapToGlobal(pos));
 
 
 
-//  if (executed == &deleteSms)
-//  {
-//    bool result = Core::instance()->modem()->deleteSms(sms.storage(), sms.index());
+  if (executed == &deleteSms)
+  {
+    Core::instance()->modem()->deleteSms(sms.storage(), sms.index());
 //    if(result)
 //    {
 //      delete lw->takeItem(index.row());
 //    }
-//  }
+  }
+}
+
+void SmsView::updateSmsCapacity(int simUsed, int simTotal, int phoneUsed, int phoneTotal)
+{
+  ui->labelSmsStorageCapacitySIMValue->setText(QString::number(simUsed) +
+                                               QString("/") +
+                                               QString::number(simTotal));
+
+  ui->labelSmsStorageCapacityPhoneValue->setText(QString::number(phoneUsed) +
+                                                 QString("/") +
+                                                 QString::number(phoneTotal));
 }
 
 void SmsView::fillSmsTextAndTooltip(Sms * sms, QString * smsText, QString * smsTooltip) const
@@ -113,34 +138,19 @@ void SmsView::fillSmsTextAndTooltip(Sms * sms, QString * smsText, QString * smsT
       tr("Storage: ") + (sms->storage() == SMS_STORAGE_SIM ? tr("SIM") : tr("Phone")) + QString("\n") +
       tr("Index: ") + QString::number(sms->index()) + QString("\n") +
       tr("UDH type: ") + sms->udhType() + QString("\n")
-   ;
+      ;
+}
+
+void SmsView::updateStatus()
+{
+  Modem * modem = Core::instance()->modem();
+  modem->updateSmsCapacity();
+  //modem->updateSms();
 }
 
 void SmsView::updateSmsFromModem()
 {
-//  // SMS storage status
-//  int simUsed = 0;
-//  int simTotal = 0;
-//  int phoneUsed = 0;
-//  int phoneTotal = 0;
-
 //  Modem * modem = Core::instance()->modem();
-
-//  modem->storageCapacityUsed(&simUsed, &simTotal, &phoneUsed, &phoneTotal);
-
-//  ui->labelSmsStorageCapacitySIMValue->setText(QString::number(simUsed) +
-//                                               QString("/") +
-//                                               QString::number(simTotal));
-
-//  ui->labelSmsStorageCapacityPhoneValue->setText(QString::number(phoneUsed) +
-//                                                 QString("/") +
-//                                                 QString::number(phoneTotal));
-
-//  // clear SMS widgets
-//  ui->lwSmsIncome->clear();
-//  ui->lwSmsDrafts->clear();
-//  ui->lwSmsSend->clear();
-
 
 //  QList<Sms> smsList;
 
@@ -176,6 +186,11 @@ void SmsView::updateSms(const QList<Sms> &smsList)
   int readSmsCount = 0;
   int draftSmsCount = 0;
   int sentSmsCount = 0;
+
+  // clear SMS widgets
+  ui->lwSmsIncome->clear();
+  ui->lwSmsDrafts->clear();
+  ui->lwSmsSend->clear();
 
   // TODO: Make SMS list sorting by date, but unread must be first!
 

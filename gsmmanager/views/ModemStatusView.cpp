@@ -80,13 +80,6 @@ void ModemStatusView::updateStatus()
   modem->updateModelInfo();
   modem->updateRevisionInfo();
   modem->updateSerialNumberInfo();
-
-  //  Modem * modem = Core::instance()->modem();
-
-//  ui->labelManufacturer->setText(modem->manufacturerInfo());
-//  ui->labelModel->setText(modem->modelInfo());
-//  ui->labelFirmware->setText(modem->revisionInfo());
-//  ui->labelSerialNumber->setText(modem->serialNumberInfo());
 }
 
 void ModemStatusView::updateManufacturerInfo(const QString &info)

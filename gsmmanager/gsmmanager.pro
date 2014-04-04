@@ -43,7 +43,8 @@ SOURCES += \
     views/ModemStatusView.cpp \
     views/UssdView.cpp \
     Ussd.cpp \
-    common.cpp
+    common.cpp \
+    PortController.cpp
 
 HEADERS  += \
     common.h \
@@ -59,7 +60,8 @@ HEADERS  += \
     views/SettingsView.h \
     views/ModemStatusView.h \
     views/UssdView.h \
-    Ussd.h
+    Ussd.h \
+    PortController.h
 
 FORMS    += \
     MainWindow.ui \
