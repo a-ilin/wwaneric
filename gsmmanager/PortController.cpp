@@ -79,7 +79,7 @@ PortController::PortController() :
 {
   m_timerTimeout = new QTimer(this);
   m_timerTimeout->setSingleShot(true);
-  m_timerTimeout->setInterval(1500);  // device timeout
+  m_timerTimeout->setInterval(10000);  // device timeout
   connect(m_timerTimeout, SIGNAL(timeout()), this, SLOT(onTimerTimeout()));
 
   m_serialPort = new QSerialPort(this);

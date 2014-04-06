@@ -2,7 +2,7 @@
 #include "ui_UssdView.h"
 
 #include "../Core.h"
-#include "../Modem.h"
+#include "../ModemUssd.h"
 
 #include <QContextMenuEvent>
 #include <QKeyEvent>
@@ -58,6 +58,11 @@ void UssdView::changeEvent(QEvent *e)
 
 void UssdView::init()
 {
+  Modem * modem = Core::instance()->modem();
+  UssdConversationHandler * ussdHandler =
+      static_cast<UssdConversationHandler*> (Core::instance()->conversationHandler(modem, USSD_HANDLER_NAME));
+
+  connect(ussdHandler, SIGNAL(updatedUssd(QString,USSD_STATUS)), SLOT(receivedUssd(QString,USSD_STATUS)));
 
 }
 
@@ -87,19 +92,20 @@ QString UssdView::name()
 
 void UssdView::sendUssd(const QString &ussd)
 {
-//  ui->ussdAnswer->appendPlainText(tr("Sent: ") + ussd);
+  const QString htmlSent("<html><head/><body><p><span style=\" color:blue;\"> %1 </span></p></body></html>");
+  ui->ussdAnswer->appendHtml(htmlSent.arg(tr("Sent: %1").arg(ussd)));
 
-//  Modem * modem = Core::instance()->modem();
-//  USSD_STATUS receivedStatus;
+  Modem * modem = Core::instance()->modem();
+  UssdConversationHandler * ussdHandler =
+      static_cast<UssdConversationHandler*> (Core::instance()->conversationHandler(modem, USSD_HANDLER_NAME));
 
-//  QString answer = modem->sendUssd(ussd, &receivedStatus);
-
-//  receivedModemUssd(answer, receivedStatus);
+  ussdHandler->sendUssd(ussd, USSD_SEND_STATUS_CODE_PRESENTATION_ON);
 }
 
-void UssdView::receivedModemUssd(const QString &ussdAnswer, USSD_STATUS status)
+void UssdView::receivedUssd(const QString &ussdAnswer, USSD_STATUS status)
 {
-  ui->ussdAnswer->appendPlainText(tr("Received: ") + ussdAnswer);
+  const QString htmlReceived("<html><head/><body><p><span style=\" color:red;\"> %1 </span></p></body></html>");
+  ui->ussdAnswer->appendHtml(htmlReceived.arg(tr("Received: \n%1").arg(ussdAnswer)));
 
   QString statusStr;
 

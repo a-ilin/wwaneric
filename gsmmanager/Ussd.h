@@ -15,6 +15,8 @@ enum USSD_STATUS
   USSD_STATUS_LAST  // this value used to type conversion check only
 };
 
+bool checkUssdStatus(int status);
+
 enum USSD_SEND_STATUS
 {
   USSD_SEND_STATUS_CODE_PRESENTATION_OFF = 0,
@@ -23,6 +25,7 @@ enum USSD_SEND_STATUS
   USSD_SEND_STATUS_LAST  // this value used to type conversion check only
 };
 
+bool checkUssdSendStatus(int status);
 
 struct Ussd
 {

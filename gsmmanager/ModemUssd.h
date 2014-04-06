@@ -15,6 +15,8 @@ enum USSD_REQUEST_TYPE
 
 struct UssdArgs : public RequestArgs
 {
+  QString ussd;
+  USSD_SEND_STATUS status;
 };
 
 class UssdConversationHandler : public ConversationHandler
@@ -32,6 +34,9 @@ public slots:
 
 signals:
   void updatedUssd(const QString &ussd, USSD_STATUS status);
+
+protected:
+  RequestArgs* requestArgs() const;
 };
 
 #endif // MODEMUSSD_H

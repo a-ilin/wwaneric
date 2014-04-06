@@ -2,6 +2,34 @@
 
 #include "common.h"
 
+bool checkUssdStatus(int status)
+{
+  switch(status)
+  {
+  case USSD_STATUS_FINISHED:
+  case USSD_STATUS_USER_ACTION_NEEDED:
+  case USSD_STATUS_DIALOGUE_TERMINATED:
+  case USSD_STATUS_OTHER_IO_RESPONDED:
+  case USSD_STATUS_OPERATION_NOT_SUPPORTED:
+  case USSD_STATUS_NETWORK_TIMEOUT:
+    return true;
+  default:
+    return false;
+  }
+}
+
+bool checkUssdSendStatus(int status)
+{
+  switch(status)
+  {
+  case USSD_SEND_STATUS_CODE_PRESENTATION_OFF:
+  case USSD_SEND_STATUS_CODE_PRESENTATION_ON:
+  case USSD_SEND_STATUS_DIALOGUE_TERMINATE:
+    return true;
+  default:
+    return false;
+  }
+}
 
 bool UssdDatabaseEntity::isDatabaseReady(Database *db) const
 {
@@ -219,3 +247,4 @@ QSqlQuery UssdDatabaseEntity::queryDelet(Database *db, const DatabaseKey &key) c
 
   return query;
 }
+
