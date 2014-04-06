@@ -2,7 +2,6 @@
 #include "ui_SmsView.h"
 
 #include "../Core.h"
-#include "../Sms.h"
 
 #include <QListWidget>
 #include <QMenu>
@@ -61,6 +60,7 @@ void SmsView::init()
 
   connect(modem, SIGNAL(updatedSmsCapacity(int,int,int,int)), SLOT(updateSmsCapacity(int,int,int,int)));
   connect(modem, SIGNAL(updatedSms(QList<Sms>)), SLOT(appendSms(QList<Sms>)));
+  connect(modem, SIGNAL(deletedSms(SMS_STORAGE,int)), SLOT(deleteSms(SMS_STORAGE,int)));
 }
 
 void SmsView::tini()
@@ -93,7 +93,6 @@ void SmsView::smsContextMenuRequested(const QPoint &pos)
   Q_ASSERT(lw);
 
   QModelIndex index = lw->indexAt(pos);
-  QListWidgetItem * item = lw->itemAt(pos);
   Sms sms = index.data(Qt::UserRole).value<Sms>();
 
   // construct menu
@@ -107,15 +106,9 @@ void SmsView::smsContextMenuRequested(const QPoint &pos)
   menu->addAction(&deleteSms);
   QAction *executed = menu->exec(lw->viewport()->mapToGlobal(pos));
 
-
-
   if (executed == &deleteSms)
   {
     Core::instance()->modem()->deleteSms(sms.storage(), sms.index());
-//    if(result)
-//    {
-//      delete lw->takeItem(index.row());
-//    }
   }
 }
 
@@ -225,4 +218,43 @@ void SmsView::appendSms(const QList<Sms> &smsList)
   ui->labelSmsIncomeCountValue->setText(QString::number(m_readSmsCount));
   ui->labelSmsDraftsCountValue->setText(QString::number(m_draftSmsCount));
   ui->labelSmsSentCountValue->setText(QString::number(m_sentSmsCount));
+}
+
+void SmsView::deleteSms(SMS_STORAGE storage, int index)
+{
+  QList<QListWidget*> lws;
+  lws << ui->lwSmsIncome << ui->lwSmsDrafts << ui->lwSmsSend;
+
+  QListWidget * lwItem = NULL;
+  int rowItem = -1;
+
+  foreach(QListWidget* lw, lws)
+  {
+    int rowCount = lw->model()->rowCount();
+    for (int i=0; i < rowCount; ++i)
+    {
+      Sms sms = lw->model()->index(i, 0).data(Qt::UserRole).value<Sms>();
+      if ((sms.storage() == storage) && (sms.index() == index))
+      {
+        lwItem = lw;
+        rowItem = i;
+        break;
+      }
+    }
+    if (lwItem)
+    {
+      break;
+    }
+  }
+
+  if (lwItem)
+  {
+    delete lwItem->takeItem(rowItem);
+  }
+  else
+  {
+    QString err = QString("Specified item not found in list! Storage: %1. Index: %2.")
+                  .arg(storage).arg(index);
+    Q_LOGEX(LOG_VERBOSE_ERROR, err);
+  }
 }

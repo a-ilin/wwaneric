@@ -2,6 +2,7 @@
 #define SMSVIEW_H
 
 #include "../IView.h"
+#include "../Sms.h"
 
 #include <QWidget>
 
@@ -45,10 +46,11 @@ private:
 
 private slots:
   void updateStatus();
-  void appendSms(const QList<Sms> &smsList);
   void smsContextMenuRequested(const QPoint &pos);
 
   void updateSmsCapacity(int simUsed, int simTotal, int phoneUsed, int phoneTotal);
+  void appendSms(const QList<Sms> &smsList);
+  void deleteSms(SMS_STORAGE storage, int index);
 
 private:
   Ui::SmsView *ui;

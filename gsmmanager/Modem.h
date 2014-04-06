@@ -67,6 +67,7 @@ signals:
   */
   void updatedSms(const QList<Sms> &smsList);
   void updatedSmsCapacity(int simUsed, int simTotal, int phoneUsed, int phoneTotal);
+  void deletedSms(SMS_STORAGE storage, int index);
 
   /*
    * USSD
@@ -89,6 +90,7 @@ private:
   {
     SMS_STATUS smsStatus;
     SMS_STORAGE smsStorage;
+    int smsIndex;
   };
 
   enum MODEM_REQUEST_TYPE
@@ -124,9 +126,6 @@ private:
     RequestArgs requestArgs;
     int requestStage;
   };
-
-private:
-
 
 private:
 

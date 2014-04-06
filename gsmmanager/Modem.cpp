@@ -14,6 +14,7 @@ QEvent::Type ModemEventType = (QEvent::Type)QEvent::registerEventType();
 #define CMD_SMS_STORAGE_CAPACITY "AT+CPMS?"
 #define CMD_SMS_SET_PREFERRED_STORAGE "AT+CPMS=%1"
 #define CMD_SMS_READ_BY_STATUS "AT+CMGL=%1"
+#define CMD_SMS_DELETE_BY_INDEX "AT+CMGD=%1,0"
 
 QStringList parseAnswerLine(const QString &line, const QString &command)
 {
@@ -61,142 +62,144 @@ bool Modem::processConversation(const Conversation &c)
 
   if (c.size() >= 2)
   {
-    QByteArray request(c.first());
+    QByteArray answerHeader(c.first());
 
     // echo reply has \r at the end
-    if (request.at(request.size() - 1) == '\r')
+    if (answerHeader.at(answerHeader.size() - 1) == '\r')
     {
-      request.remove(request.size() - 2, 1);
+      answerHeader.remove(answerHeader.size() - 2, 1);
     }
 
     /* QByteArray status(c.last()); */
 
-    MODEM_REQUEST_TYPE &requestType = m_requests.first().requestType;
-    RequestArgs &requestArgs = m_requests.first().requestArgs;
-    int &requestStage = m_requests.first().requestStage;
+    if (requestData() == answerHeader)
+    {
+      const MODEM_REQUEST_TYPE &requestType = m_requests.first().requestType;
+      const RequestArgs &requestArgs = m_requests.first().requestArgs;
+      int &requestStage = m_requests.first().requestStage;
 
-    if ((requestType == MODEM_REQUEST_MANUFACTURER_INFO) && (request == CMD_MANUFACTURER_INFO))
-    {
-      emit updatedManufacturerInfo(c.at(1));
-      success = true;
-      requestProcessed = true;
-    }
-    else if ((requestType == MODEM_REQUEST_MODEL_INFO) && (request == CMD_MODEL_INFO))
-    {
-      emit updatedModelInfo(c.at(1));
-      success = true;
-      requestProcessed = true;
-    }
-    else if ((requestType == MODEM_REQUEST_SERIAL_NUMBER) && (request == CMD_SERIAL_NUMBER))
-    {
-      emit updatedSerialNumberInfo(c.at(1));
-      success = true;
-      requestProcessed = true;
-    }
-    else if ((requestType == MODEM_REQUEST_REVISION_INFO) && (request == CMD_REVISION_INFO))
-    {
-      emit updatedRevisionInfo(c.at(1));
-      success = true;
-      requestProcessed = true;
-    }
-    else if ((requestType == MODEM_REQUEST_SMS_CAPACITY) && (request == CMD_SMS_STORAGE_CAPACITY))
-    {
-      QStringList storageLine = parseAnswerLine(c.at(1), "+CPMS:");
-      const int blockSize = 3;
-      bool answerDecoded = true;
-      int simUsed = 0;
-      int simTotal = 0;
-      int phoneUsed = 0;
-      int phoneTotal = 0;
-
-      if (!(storageLine.size() % blockSize))
+      if (requestType == MODEM_REQUEST_MANUFACTURER_INFO)
       {
-        for(int i = 0; i < storageLine.size() / blockSize; ++i)
-        {
-          int * p_used = 0;
-          int * p_total = 0;
-
-          if (storageLine.at(i*blockSize) == SMS_STORAGE_PHONE_STR)
-          {
-            p_used = &phoneUsed;
-            p_total = &phoneTotal;
-          }
-          else if (storageLine.at(i*blockSize) == SMS_STORAGE_SIM_STR)
-          {
-            p_used = &simUsed;
-            p_total = &simTotal;
-          }
-          else
-          {
-            break;
-          }
-
-          SAFE_CONVERT(int, toInt, used, storageLine.at(i*blockSize+1), answerDecoded = false;break;);
-          *p_used = used;
-          SAFE_CONVERT(int, toInt, total, storageLine.at(i*blockSize+2), answerDecoded = false;break;);
-          *p_total = total;
-        }
-      }
-      else
-      {
-        answerDecoded = false;
-      }
-
-      if (answerDecoded)
-      {
-        emit updatedSmsCapacity(simUsed, simTotal, phoneUsed, phoneTotal);
+        emit updatedManufacturerInfo(c.at(1));
         success = true;
         requestProcessed = true;
       }
-      else
+      else if (requestType == MODEM_REQUEST_MODEL_INFO)
       {
-        Q_LOGEX(LOG_VERBOSE_ERROR, "Cannot decode modem answer for storage capacity request!");
-      }
-    }
-    else if (requestType == MODEM_REQUEST_SMS_READ)
-    {
-      const QString cmdSetSmsStorage = QString(CMD_SMS_SET_PREFERRED_STORAGE)
-                                       .arg(smsStorageStr(requestArgs.smsArgs.smsStorage));
-
-      const QString cmdReadSmsByStatus = QString(CMD_SMS_READ_BY_STATUS)
-                                         .arg(requestArgs.smsArgs.smsStatus);
-
-      // set preferred storage
-      if ((requestStage == 0) && (request == cmdSetSmsStorage))
-      {
-        requestStage = 1;
+        emit updatedModelInfo(c.at(1));
         success = true;
-        requestProcessed = false;
+        requestProcessed = true;
       }
-      // read SMSes
-      else if ((requestStage == 1) && (request == cmdReadSmsByStatus))
+      else if (requestType == MODEM_REQUEST_SERIAL_NUMBER)
       {
-        SmsArgs smsArgs = requestArgs.smsArgs;
+        emit updatedSerialNumberInfo(c.at(1));
+        success = true;
+        requestProcessed = true;
+      }
+      else if (requestType == MODEM_REQUEST_REVISION_INFO)
+      {
+        emit updatedRevisionInfo(c.at(1));
+        success = true;
+        requestProcessed = true;
+      }
+      else if (requestType == MODEM_REQUEST_SMS_CAPACITY)
+      {
+        QStringList storageLine = parseAnswerLine(c.at(1), "+CPMS:");
+        const int blockSize = 3;
+        bool answerDecoded = true;
+        int simUsed = 0;
+        int simTotal = 0;
+        int phoneUsed = 0;
+        int phoneTotal = 0;
 
-        QList <Sms> smsList;
-        int answerDecoded = true;
-        int smsLineCount = c.size() - 2; // exclude request itself and "OK"
-        if ((smsLineCount > 0) && (!(smsLineCount % 2)))  // each SMS has 2 lines: header and PDU
+        if (!(storageLine.size() % blockSize))
         {
-          for (int i=1; i< c.size()-1; i+=2)
+          for(int i = 0; i < storageLine.size() / blockSize; ++i)
           {
-            QStringList headerLine = parseAnswerLine(c.at(i), "+CMGL:");
+            int * p_used = 0;
+            int * p_total = 0;
 
-            // header has 4 fields
-            if (headerLine.size() == 4)
+            if (storageLine.at(i*blockSize) == SMS_STORAGE_PHONE_STR)
             {
-              SAFE_CONVERT(int, toInt, msgIndex,  headerLine.at(0), answerDecoded=false;break;);
-              SAFE_CONVERT(int, toInt, msgStatus, headerLine.at(1), answerDecoded=false;break;);
-              // field at index 2 is 'alpha' and not used
-              // field at index 3 is octet count and not used
+              p_used = &phoneUsed;
+              p_total = &phoneTotal;
+            }
+            else if (storageLine.at(i*blockSize) == SMS_STORAGE_SIM_STR)
+            {
+              p_used = &simUsed;
+              p_total = &simTotal;
+            }
+            else
+            {
+              break;
+            }
 
-              QByteArray pdu = c.at(i+1);
+            SAFE_CONVERT(int, toInt, used, storageLine.at(i*blockSize+1), answerDecoded = false;break;);
+            *p_used = used;
+            SAFE_CONVERT(int, toInt, total, storageLine.at(i*blockSize+2), answerDecoded = false;break;);
+            *p_total = total;
+          }
+        }
+        else
+        {
+          answerDecoded = false;
+        }
 
-              Sms sms(smsArgs.smsStorage, (SMS_STATUS)msgStatus, msgIndex, pdu);
+        if (answerDecoded)
+        {
+          emit updatedSmsCapacity(simUsed, simTotal, phoneUsed, phoneTotal);
+          success = true;
+          requestProcessed = true;
+        }
+        else
+        {
+          Q_LOGEX(LOG_VERBOSE_ERROR, "Cannot decode modem answer for storage capacity request!");
+        }
+      }
+      else if (requestType == MODEM_REQUEST_SMS_READ)
+      {
+        // set preferred storage
+        if (requestStage == 0)
+        {
+          requestStage = 1;
+          success = true;
+          requestProcessed = false;
+        }
+        // read SMSes
+        else if (requestStage == 1)
+        {
+          SmsArgs smsArgs = requestArgs.smsArgs;
 
-              if (sms.isValid())
+          QList <Sms> smsList;
+          int answerDecoded = true;
+          int smsLineCount = c.size() - 2; // exclude request itself and "OK"
+          if ((smsLineCount > 0) && (!(smsLineCount % 2)))  // each SMS has 2 lines: header and PDU
+          {
+            for (int i=1; i< c.size()-1; i+=2)
+            {
+              QStringList headerLine = parseAnswerLine(c.at(i), "+CMGL:");
+
+              // header has 4 fields
+              if (headerLine.size() == 4)
               {
-                smsList.append(sms);
+                SAFE_CONVERT(int, toInt, msgIndex,  headerLine.at(0), answerDecoded=false;break;);
+                SAFE_CONVERT(int, toInt, msgStatus, headerLine.at(1), answerDecoded=false;break;);
+                // field at index 2 is 'alpha' and not used
+                // field at index 3 is octet count and not used
+
+                QByteArray pdu = c.at(i+1);
+
+                Sms sms(smsArgs.smsStorage, (SMS_STATUS)msgStatus, msgIndex, pdu);
+
+                if (sms.isValid())
+                {
+                  smsList.append(sms);
+                }
+                else
+                {
+                  answerDecoded = false;
+                  break;
+                }
               }
               else
               {
@@ -204,34 +207,53 @@ bool Modem::processConversation(const Conversation &c)
                 break;
               }
             }
-            else
-            {
-              answerDecoded = false;
-              break;
-            }
+          }
+
+          if (answerDecoded == false)
+          {
+            // reset stage to initial
+            requestStage = 0;
+            Q_LOGEX(LOG_VERBOSE_ERROR, "Error processing SMS answer!");
+          }
+          else
+          {
+            emit updatedSms(smsList);
+            success = true;
+            requestProcessed = true;
           }
         }
-
-        if (answerDecoded == false)
+      }
+      else if (requestType == MODEM_REQUEST_SMS_DELETE)
+      {
+        // set preferred storage
+        if (requestStage == 0)
         {
-          // reset stage to initial
-          requestStage = 0;
-          Q_LOGEX(LOG_VERBOSE_ERROR, "Error processing SMS answer!");
+          requestStage = 1;
+          success = true;
+          requestProcessed = false;
         }
-        else
+        // read SMSes
+        else if (requestStage == 1)
         {
-          emit updatedSms(smsList);
+          emit deletedSms(requestArgs.smsArgs.smsStorage, requestArgs.smsArgs.smsIndex);
           success = true;
           requestProcessed = true;
         }
       }
+      else
+      {
+        QString str = QString("Unprocessed answer received. Request: type %1. Answer: %2")
+                      .arg(requestType)
+                      .arg(QString(answerHeader));
+        Q_LOGEX(LOG_VERBOSE_CRITICAL, str);
+      }
     }
     else
     {
-      QString str = QString("Unprocessed answer received. Request: type %1. Answer: %2")
-                    .arg(requestType)
-                    .arg(QString(request));
-      Q_LOGEX(LOG_VERBOSE_WARNING, str);
+      QString str = QString("Unexpected answer received. Request: %1. Answer: %2")
+                    .arg(QString(requestData()))
+                    .arg(QString(answerHeader));
+      Q_LOGEX(LOG_VERBOSE_CRITICAL, str);
     }
   }
   else
@@ -288,6 +310,23 @@ QByteArray Modem::requestData() const
       {
         data = QString(CMD_SMS_READ_BY_STATUS)
                .arg(requestArgs.smsArgs.smsStatus).toLatin1();
+      }
+      else
+      {
+        Q_LOGEX(LOG_VERBOSE_CRITICAL, "Wrong stage!")
+      }
+    }
+    else if (requestType == MODEM_REQUEST_SMS_DELETE)
+    {
+      if (requestStage == 0)
+      {
+        data = QString(CMD_SMS_SET_PREFERRED_STORAGE)
+               .arg(smsStorageStr(requestArgs.smsArgs.smsStorage)).toLatin1();
+      }
+      else if (requestStage == 1)
+      {
+        data = QString(CMD_SMS_DELETE_BY_INDEX)
+               .arg(requestArgs.smsArgs.smsIndex).toLatin1();
       }
       else
       {
@@ -370,7 +409,16 @@ void Modem::sendSms(const Sms &sms)
 
 void Modem::deleteSms(SMS_STORAGE storage, int index)
 {
+  SmsArgs smsArgs;
+  smsArgs.smsStorage = storage;
+  smsArgs.smsIndex = index;
 
+  RequestArgs args;
+  args.smsArgs = smsArgs;
+
+  m_requests.append(ModemRequest(MODEM_REQUEST_SMS_DELETE, args));
+
+  sendRequest();
 }
 
 /*
