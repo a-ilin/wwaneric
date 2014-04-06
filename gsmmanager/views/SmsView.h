@@ -45,14 +45,18 @@ private:
 
 private slots:
   void updateStatus();
-  void updateSmsFromModem();
-  void updateSms(const QList<Sms> &smsList);
+  void appendSms(const QList<Sms> &smsList);
   void smsContextMenuRequested(const QPoint &pos);
 
   void updateSmsCapacity(int simUsed, int simTotal, int phoneUsed, int phoneTotal);
 
 private:
   Ui::SmsView *ui;
+
+  int m_newSmsCount;
+  int m_readSmsCount;
+  int m_draftSmsCount;
+  int m_sentSmsCount;
 
 };
 

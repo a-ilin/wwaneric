@@ -7,6 +7,37 @@
 #include <QSqlDatabase>
 #include <QSqlError>
 
+QString smsStorageStr(SMS_STORAGE storage)
+{
+  if (storage == SMS_STORAGE_PHONE)
+  {
+    return QString(SMS_STORAGE_PHONE_STR);
+  }
+  else if (storage == SMS_STORAGE_SIM)
+  {
+    return QString(SMS_STORAGE_SIM_STR);
+  }
+
+  Q_LOGEX(LOG_VERBOSE_ERROR, "Wrong SMS storage specified!");
+
+  return QString();
+}
+
+bool checkSmsStatus(int status)
+{
+  switch(status)
+  {
+  case SMS_STATUS_NEW:
+  case SMS_STATUS_INCOME:
+  case SMS_STATUS_DRAFT:
+  case SMS_STATUS_SENT:
+  case SMS_STATUS_ALL:
+    return true;
+  default:
+    return false;
+  }
+}
+
 SmsMeta::SmsMeta() :
   m_valid(false)
 {
@@ -256,3 +287,5 @@ QSqlQuery SmsDatabaseEntity::queryDelet(Database *db, const DatabaseKey &key) co
 {
   return QSqlQuery();
 }
+
+

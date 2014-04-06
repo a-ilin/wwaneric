@@ -6,20 +6,28 @@
 
 #include "Database.h"
 
+// from ST-Ericcsson docs
+#define SMS_STORAGE_SIM_STR "\"SM\""
+#define SMS_STORAGE_PHONE_STR "\"ME\""
+
 enum SMS_STORAGE
 {
   SMS_STORAGE_SIM   = 0x1,
   SMS_STORAGE_PHONE = 0x2
 };
 
+QString smsStorageStr(SMS_STORAGE storage);
+
 enum SMS_STATUS
 {
-  SMS_STATUS_NEW =    0x0,  // received and not readed yet
-  SMS_STATUS_INCOME = 0x1,  // received
+  SMS_STATUS_NEW =    0x0,  // received and not read yet
+  SMS_STATUS_INCOME = 0x1,  // received and read
   SMS_STATUS_DRAFT =  0x2,  // draft
   SMS_STATUS_SENT =   0x3,  // sent
   SMS_STATUS_ALL =    0x4   // all
 };
+
+bool checkSmsStatus(int status);
 
 class SmsMeta
 {

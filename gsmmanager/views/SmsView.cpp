@@ -10,7 +10,11 @@
 SmsView::SmsView(QWidget *parent) :
   QWidget(parent),
   IView(),
-  ui(new Ui::SmsView)
+  ui(new Ui::SmsView),
+  m_newSmsCount(0),
+  m_readSmsCount(0),
+  m_draftSmsCount(0),
+  m_sentSmsCount(0)
 {
   ui->setupUi(this);
 
@@ -55,7 +59,8 @@ void SmsView::init()
 {
   Modem * modem = Core::instance()->modem();
 
-  connect(modem, SIGNAL(updatedManufacturerInfo(QString)), SLOT(updateManufacturerInfo(QString)));
+  connect(modem, SIGNAL(updatedSmsCapacity(int,int,int,int)), SLOT(updateSmsCapacity(int,int,int,int)));
+  connect(modem, SIGNAL(updatedSms(QList<Sms>)), SLOT(appendSms(QList<Sms>)));
 }
 
 void SmsView::tini()
@@ -68,7 +73,7 @@ void SmsView::restore(Settings &set)
   SmsDatabaseEntity smsDb;
   if (smsDb.init())
   {
-    updateSms(smsDb.select());
+    appendSms(smsDb.select());
   }
 }
 
@@ -145,52 +150,28 @@ void SmsView::updateStatus()
 {
   Modem * modem = Core::instance()->modem();
   modem->updateSmsCapacity();
-  //modem->updateSms();
-}
 
-void SmsView::updateSmsFromModem()
-{
-//  Modem * modem = Core::instance()->modem();
-
-//  QList<Sms> smsList;
-
-//  // SMS new read from SIM and phone
-//  smsList.append(modem->readSms(SMS_STORAGE_SIM, SMS_STATUS_NEW));
-//  smsList.append(modem->readSms(SMS_STORAGE_PHONE, SMS_STATUS_NEW));
-
-//  // SMS old read from SIM and phone
-//  smsList.append(modem->readSms(SMS_STORAGE_SIM, SMS_STATUS_INCOME));
-//  smsList.append(modem->readSms(SMS_STORAGE_PHONE, SMS_STATUS_INCOME));
-
-//  // SMS drafts read from SIM and phone
-//  smsList.append(modem->readSms(SMS_STORAGE_SIM, SMS_STATUS_DRAFT));
-//  smsList.append(modem->readSms(SMS_STORAGE_PHONE, SMS_STATUS_DRAFT));
-
-//  // SMS sent read from SIM and phone
-//  smsList.append(modem->readSms(SMS_STORAGE_SIM, SMS_STATUS_SENT));
-//  smsList.append(modem->readSms(SMS_STORAGE_PHONE, SMS_STATUS_SENT));
-
-//  // write to DB
-//  SmsDatabaseEntity smsDb;
-//  if (smsDb.init())
-//  {
-//    smsDb.insert(smsList);
-//  }
-
-//  updateSms(smsList);
-}
-
-void SmsView::updateSms(const QList<Sms> &smsList)
-{
-  int newSmsCount = 0;
-  int readSmsCount = 0;
-  int draftSmsCount = 0;
-  int sentSmsCount = 0;
+  modem->updateSms(SMS_STORAGE_SIM, SMS_STATUS_ALL);
+  modem->updateSms(SMS_STORAGE_PHONE, SMS_STATUS_ALL);
 
   // clear SMS widgets
   ui->lwSmsIncome->clear();
   ui->lwSmsDrafts->clear();
   ui->lwSmsSend->clear();
+  m_newSmsCount = 0;
+  m_readSmsCount = 0;
+  m_draftSmsCount = 0;
+  m_sentSmsCount = 0;
+}
+
+void SmsView::appendSms(const QList<Sms> &smsList)
+{
+  // write to DB
+  SmsDatabaseEntity smsDb;
+  if (smsDb.init())
+  {
+    smsDb.insert(smsList);
+  }
 
   // TODO: Make SMS list sorting by date, but unread must be first!
 
@@ -218,30 +199,30 @@ void SmsView::updateSms(const QList<Sms> &smsList)
       // temporary solution for new items
       smsItem->setBackgroundColor(Qt::GlobalColor::cyan);
       ui->lwSmsIncome->addItem(smsItem);
-      newSmsCount++;
+      m_newSmsCount++;
     }
 
     if (sms.status() == SMS_STATUS_INCOME)
     {
       ui->lwSmsIncome->addItem(smsItem);
-      readSmsCount++;
+      m_readSmsCount++;
     }
 
     if (sms.status() == SMS_STATUS_DRAFT)
     {
       ui->lwSmsDrafts->addItem(smsItem);
-      draftSmsCount++;
+      m_draftSmsCount++;
     }
 
     if (sms.status() == SMS_STATUS_SENT)
     {
       ui->lwSmsSend->addItem(smsItem);
-      sentSmsCount++;
+      m_sentSmsCount++;
     }
   }
 
-  ui->labelSmsNewCountValue->setText(QString::number(newSmsCount));
-  ui->labelSmsIncomeCountValue->setText(QString::number(readSmsCount));
-  ui->labelSmsDraftsCountValue->setText(QString::number(draftSmsCount));
-  ui->labelSmsSentCountValue->setText(QString::number(sentSmsCount));
+  ui->labelSmsNewCountValue->setText(QString::number(m_newSmsCount));
+  ui->labelSmsIncomeCountValue->setText(QString::number(m_readSmsCount));
+  ui->labelSmsDraftsCountValue->setText(QString::number(m_draftSmsCount));
+  ui->labelSmsSentCountValue->setText(QString::number(m_sentSmsCount));
 }

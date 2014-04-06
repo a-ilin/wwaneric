@@ -42,7 +42,12 @@ protected:
   // return true if conversation was recognized and successfully processed
   virtual bool processConversation(const Conversation & c) = 0;
 
-  // wrapper for sendToPort, adds request to queue before calling sendToPort
+  // return raw data for request from queue
+  virtual QByteArray requestData() const = 0;
+
+protected slots:
+  // retrieves next request and sends it to port sendToPort
+  void sendRequest();
   void sendRequest(const QByteArray &request);
 
 private:
@@ -66,11 +71,11 @@ private slots:
 
 private:
 
-  enum MODEM_STATUS
+  enum PORT_CONTROLLER_STATUS
   {
-    MODEM_STATUS_READY,
-    MODEM_STATUS_BUSY
-  } m_modemStatus;
+    PORT_CONTROLLER_STATUS_READY,
+    PORT_CONTROLLER_STATUS_BUSY
+  } m_portControllerStatus;
 
   // modem detected on specified port
   bool m_modemDetected;
@@ -80,10 +85,6 @@ private:
 
   // received data buffer
   QByteArray m_bufferReceived;
-
-  // set of requests to send to modem
-  typedef QLinkedList<QByteArray> Requests;
-  Requests m_requestsToSend;
 
   // timer timeout
   QTimer * m_timerTimeout;

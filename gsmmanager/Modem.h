@@ -12,8 +12,6 @@
 // an ID for QEvent object constructing
 extern QEvent::Type ModemEventType;
 
-
-
 class Modem : public PortController
 {
   Q_OBJECT
@@ -67,7 +65,7 @@ signals:
    * SMS
    *
   */
-  void updatedSms(SMS_STORAGE storage, SMS_STATUS status, const QList<Sms> &smsList);
+  void updatedSms(const QList<Sms> &smsList);
   void updatedSmsCapacity(int simUsed, int simTotal, int phoneUsed, int phoneTotal);
 
   /*
@@ -80,15 +78,59 @@ protected:
   // return true if conversation was recognized and successfully processed
   bool processConversation(const Conversation & c);
 
+  // return raw data for request from queue
+  QByteArray requestData() const;
+
+private:
+
+  // internal types
+
+  struct SmsArgs
+  {
+    SMS_STATUS smsStatus;
+    SMS_STORAGE smsStorage;
+  };
+
+  enum MODEM_REQUEST_TYPE
+  {
+    MODEM_REQUEST_MANUFACTURER_INFO,
+    MODEM_REQUEST_MODEL_INFO,
+    MODEM_REQUEST_SERIAL_NUMBER,
+    MODEM_REQUEST_REVISION_INFO,
+    MODEM_REQUEST_SMS_CAPACITY,
+    MODEM_REQUEST_SMS_READ,
+    MODEM_REQUEST_SMS_DELETE
+  };
+
+  union RequestArgs
+  {
+    SmsArgs smsArgs;
+  };
+
+  struct ModemRequest
+  {
+    ModemRequest(MODEM_REQUEST_TYPE type) :
+      requestType(type),
+      requestStage(0)
+    {}
+
+    ModemRequest(MODEM_REQUEST_TYPE type, const RequestArgs &args) :
+      requestType(type),
+      requestArgs(args),
+      requestStage(0)
+    {}
+
+    MODEM_REQUEST_TYPE requestType;
+    RequestArgs requestArgs;
+    int requestStage;
+  };
+
 private:
 
 
-  static QStringList parseModemAnswer(const QString &inputText,
-                                      const QString &splitter,
-                                      const QString &command);
+private:
 
-
-
+  QLinkedList<ModemRequest> m_requests;
 
 };
 

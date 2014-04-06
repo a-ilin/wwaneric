@@ -74,7 +74,7 @@ QList<Conversation> parse(const QByteArray &answer, int &unparsedRestSize)
 
 PortController::PortController() :
   QObject(),
-  m_modemStatus(MODEM_STATUS_READY),
+  m_portControllerStatus(PORT_CONTROLLER_STATUS_READY),
   m_modemDetected(false)
 {
   m_timerTimeout = new QTimer(this);
@@ -143,10 +143,9 @@ void PortController::closePort()
 
   m_timerTimeout->stop();
 
-  m_requestsToSend.clear();
   m_bufferReceived.clear();
 
-  m_modemStatus = MODEM_STATUS_READY;
+  m_portControllerStatus = PORT_CONTROLLER_STATUS_READY;
   m_modemDetected = false;
 
   emit updatedPortStatus(false);
@@ -175,6 +174,22 @@ void PortController::onReadyRead()
   if (!parseBuffer())
   {
     m_timerTimeout->start();
+  }
+  else
+  {
+    if (m_portControllerStatus == PORT_CONTROLLER_STATUS_READY)
+    {
+      if (m_bufferReceived.size() > 0)
+      {
+        QString str = QString("Answer processed but unneeded data found. Clearing buffer. Data: ")
+                      .arg(QString(m_bufferReceived));
+        Q_LOGEX(LOG_VERBOSE_WARNING, str);
+
+        m_bufferReceived.clear();
+      }
+
+      sendRequest();
+    }
   }
 }
 
@@ -216,17 +231,19 @@ void PortController::onReadChannelFinished()
 
 void PortController::onTimerTimeout()
 {
-  Q_LOGEX(LOG_VERBOSE_ERROR, "Request timeout. Clearing data buffer.");
+  Q_LOGEX(LOG_VERBOSE_ERROR, "Request timeout. Clearing received buffer.");
 
   m_bufferReceived.clear();
-  m_modemStatus = MODEM_STATUS_READY;
-
-  sendRequestFromQueue();
+  m_portControllerStatus = PORT_CONTROLLER_STATUS_READY;
 
   if ((!m_serialPort->isOpen()) || (!m_modemDetected))
   {
     // clearing buffer, etc...
     closePort();
+  }
+  else
+  {
+    sendRequest();
   }
 }
 
@@ -260,31 +277,20 @@ void PortController::sendRequest(const QByteArray &request)
 {
   if (m_serialPort->isOpen())
   {
-    if (!m_requestsToSend.contains(request))
+    QByteArray data = request;
+    if ((m_portControllerStatus == PORT_CONTROLLER_STATUS_READY) &&
+        (data.size() > 0))
     {
-      m_requestsToSend.append(request);
-    }
-
-    if ((m_modemStatus == MODEM_STATUS_READY) &&
-        (m_requestsToSend.size() > 0))
-    {
-      // rotate request
-      QByteArray request = m_requestsToSend.takeFirst();
-      m_requestsToSend.append(request);
-
-      request.append("\r\n");
-      sendToPort(request);
-      m_modemStatus = MODEM_STATUS_BUSY;
+      data.append("\r\n");
+      sendToPort(data);
+      m_portControllerStatus = PORT_CONTROLLER_STATUS_BUSY;
     }
   }
 }
 
-void PortController::sendRequestFromQueue()
+void PortController::sendRequest()
 {
-  if (m_requestsToSend.size() > 0)
-  {
-    sendRequest(m_requestsToSend.takeFirst());
-  }
+  sendRequest(requestData());
 }
 
 bool PortController::parseBuffer()
@@ -300,7 +306,7 @@ bool PortController::parseBuffer()
     m_bufferReceived.clear();
   }
 
-  if (m_modemStatus == MODEM_STATUS_READY)
+  if (m_portControllerStatus == PORT_CONTROLLER_STATUS_READY)
   {
     QString str = QString("Modem status is READY when new data arrived. Clearing data buffer.");
     Q_LOGEX(LOG_VERBOSE_WARNING, str);
@@ -342,8 +348,8 @@ bool PortController::parseBuffer()
             Q_LOGEX(LOG_VERBOSE_WARNING, "Received READY while modem was already detected.");
           }
 
-          m_modemStatus = MODEM_STATUS_READY;
-          m_requestsToSend.removeAll("AT");
+          m_portControllerStatus = PORT_CONTROLLER_STATUS_READY;
+
           m_modemDetected = true;
           emit updatedPortStatus(true);
         }
@@ -351,8 +357,7 @@ bool PortController::parseBuffer()
         {
           if (processConversation(c))
           {
-            m_modemStatus = MODEM_STATUS_READY;
-            m_requestsToSend.removeAll(request);
+            m_portControllerStatus = PORT_CONTROLLER_STATUS_READY;
           }
         }
         else
@@ -370,19 +375,5 @@ bool PortController::parseBuffer()
     }
   }
 
-  if (m_modemStatus == MODEM_STATUS_READY)
-  {
-    if (m_bufferReceived.size() > 0)
-    {
-      QString str = QString("Request processed but unneeded data found. Clearing buffer. Data: ")
-                    .arg(QString(m_bufferReceived));
-      Q_LOGEX(LOG_VERBOSE_WARNING, str);
-
-      m_bufferReceived.clear();
-    }
-
-    sendRequestFromQueue();
-  }
-
-  return m_modemDetected && (m_modemStatus == MODEM_STATUS_READY);
+  return m_modemDetected && (m_portControllerStatus == PORT_CONTROLLER_STATUS_READY);
 }
