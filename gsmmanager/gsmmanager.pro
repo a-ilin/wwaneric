@@ -44,7 +44,10 @@ SOURCES += \
     views/UssdView.cpp \
     Ussd.cpp \
     common.cpp \
-    PortController.cpp
+    PortController.cpp \
+    ModemSms.cpp \
+    ModemStatus.cpp \
+    ModemUssd.cpp
 
 HEADERS  += \
     common.h \
@@ -61,7 +64,10 @@ HEADERS  += \
     views/ModemStatusView.h \
     views/UssdView.h \
     Ussd.h \
-    PortController.h
+    PortController.h \
+    ModemSms.h \
+    ModemStatus.h \
+    ModemUssd.h
 
 FORMS    += \
     MainWindow.ui \

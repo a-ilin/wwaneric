@@ -3,6 +3,8 @@
 
 #include "../Core.h"
 
+#include "../ModemStatus.h"
+
 ModemStatusView::ModemStatusView(QWidget *parent) :
   QWidget(parent),
   IView(),
@@ -32,11 +34,13 @@ void ModemStatusView::changeEvent(QEvent *e)
 void ModemStatusView::init()
 {
   Modem * modem = Core::instance()->modem();
+  StatusConversationHandler * statusHandler =
+      static_cast<StatusConversationHandler*> (Core::instance()->conversationHandler(modem, STATUS_HANDLER_NAME));
 
-  connect(modem, SIGNAL(updatedManufacturerInfo(QString)), SLOT(updateManufacturerInfo(QString)));
-  connect(modem, SIGNAL(updatedModelInfo(QString)), SLOT(updateModelInfo(QString)));
-  connect(modem, SIGNAL(updatedRevisionInfo(QString)), SLOT(updateRevisionInfo(QString)));
-  connect(modem, SIGNAL(updatedSerialNumberInfo(QString)), SLOT(updateSerialNumberInfo(QString)));
+  connect(statusHandler, SIGNAL(updatedManufacturerInfo(QString)), SLOT(updateManufacturerInfo(QString)));
+  connect(statusHandler, SIGNAL(updatedModelInfo(QString)),        SLOT(updateModelInfo(QString)));
+  connect(statusHandler, SIGNAL(updatedRevisionInfo(QString)),     SLOT(updateRevisionInfo(QString)));
+  connect(statusHandler, SIGNAL(updatedSerialNumberInfo(QString)), SLOT(updateSerialNumberInfo(QString)));
 }
 
 void ModemStatusView::tini()
@@ -76,10 +80,13 @@ bool ModemStatusView::event(QEvent *e)
 void ModemStatusView::updateStatus()
 {
   Modem * modem = Core::instance()->modem();
-  modem->updateManufacturerInfo();
-  modem->updateModelInfo();
-  modem->updateRevisionInfo();
-  modem->updateSerialNumberInfo();
+  StatusConversationHandler * statusHandler =
+      static_cast<StatusConversationHandler*> (Core::instance()->conversationHandler(modem, STATUS_HANDLER_NAME));
+
+  statusHandler->updateManufacturerInfo();
+  statusHandler->updateModelInfo();
+  statusHandler->updateRevisionInfo();
+  statusHandler->updateSerialNumberInfo();
 }
 
 void ModemStatusView::updateManufacturerInfo(const QString &info)

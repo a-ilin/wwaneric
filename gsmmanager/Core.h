@@ -23,11 +23,17 @@ public:
 
   QString appUserDirectory() const;
 
+  ConversationHandler* conversationHandler(Modem *modem, const QString &name) const;
+
 private:
 
   static Core * m_instance;
 
   QMap<QString, QSharedPointer<Modem> > m_modems;
+
+  typedef QHash<QString, ConversationHandler*> ConversationHandlersHash;
+  typedef QHash<Modem*,  ConversationHandlersHash> ConversationHandlersModemHash;
+  ConversationHandlersModemHash m_conversationHandlers;
 
   Q_DISABLE_COPY(Core)
 };

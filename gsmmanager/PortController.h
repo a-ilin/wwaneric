@@ -9,6 +9,8 @@
 class QSerialPort;
 class QTimer;
 
+// first line of Conversation has request itself
+// last line of Conversation has status: OK/ERROR
 typedef QList<QByteArray> Conversation;
 
 class PortController : public QObject

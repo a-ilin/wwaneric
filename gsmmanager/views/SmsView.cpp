@@ -3,6 +3,8 @@
 
 #include "../Core.h"
 
+#include "../ModemSms.h"
+
 #include <QListWidget>
 #include <QMenu>
 
@@ -18,7 +20,7 @@ SmsView::SmsView(QWidget *parent) :
   ui->setupUi(this);
 
   connect(ui->lwSmsIncome, SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(smsContextMenuRequested(QPoint)));
-  connect(ui->lwSmsSend, SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(smsContextMenuRequested(QPoint)));
+  connect(ui->lwSmsSend,   SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(smsContextMenuRequested(QPoint)));
   connect(ui->lwSmsDrafts, SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(smsContextMenuRequested(QPoint)));
 }
 
@@ -57,10 +59,12 @@ bool SmsView::event(QEvent *e)
 void SmsView::init()
 {
   Modem * modem = Core::instance()->modem();
+  SmsConversationHandler * smsHandler =
+      static_cast<SmsConversationHandler*> (Core::instance()->conversationHandler(modem, SMS_HANDLER_NAME));
 
-  connect(modem, SIGNAL(updatedSmsCapacity(int,int,int,int)), SLOT(updateSmsCapacity(int,int,int,int)));
-  connect(modem, SIGNAL(updatedSms(QList<Sms>)), SLOT(appendSms(QList<Sms>)));
-  connect(modem, SIGNAL(deletedSms(SMS_STORAGE,int)), SLOT(deleteSms(SMS_STORAGE,int)));
+  connect(smsHandler, SIGNAL(updatedSmsCapacity(int,int,int,int)), SLOT(updateSmsCapacity(int,int,int,int)));
+  connect(smsHandler, SIGNAL(updatedSms(QList<Sms>)),              SLOT(appendSms(QList<Sms>)));
+  connect(smsHandler, SIGNAL(deletedSms(SMS_STORAGE,int)),         SLOT(deleteSms(SMS_STORAGE,int)));
 }
 
 void SmsView::tini()
@@ -108,7 +112,11 @@ void SmsView::smsContextMenuRequested(const QPoint &pos)
 
   if (executed == &deleteSms)
   {
-    Core::instance()->modem()->deleteSms(sms.storage(), sms.index());
+    Modem * modem = Core::instance()->modem();
+    SmsConversationHandler * smsHandler =
+        static_cast<SmsConversationHandler*> (Core::instance()->conversationHandler(modem, SMS_HANDLER_NAME));
+
+    smsHandler->deleteSms(sms.storage(), sms.index());
   }
 }
 
@@ -142,10 +150,12 @@ void SmsView::fillSmsTextAndTooltip(Sms * sms, QString * smsText, QString * smsT
 void SmsView::updateStatus()
 {
   Modem * modem = Core::instance()->modem();
-  modem->updateSmsCapacity();
+  SmsConversationHandler * smsHandler =
+      static_cast<SmsConversationHandler*> (Core::instance()->conversationHandler(modem, SMS_HANDLER_NAME));
 
-  modem->updateSms(SMS_STORAGE_SIM, SMS_STATUS_ALL);
-  modem->updateSms(SMS_STORAGE_PHONE, SMS_STATUS_ALL);
+  smsHandler->updateSmsCapacity();
+  smsHandler->updateSms(SMS_STORAGE_SIM, SMS_STATUS_ALL);
+  smsHandler->updateSms(SMS_STORAGE_PHONE, SMS_STATUS_ALL);
 
   // clear SMS widgets
   ui->lwSmsIncome->clear();
