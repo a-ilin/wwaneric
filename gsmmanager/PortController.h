@@ -11,7 +11,27 @@ class QTimer;
 
 // first line of Conversation has request itself
 // last line of Conversation has status: OK/ERROR
-typedef QList<QByteArray> Conversation;
+//typedef QList<QByteArray> Conversation;
+
+struct Conversation
+{
+  enum STATUS
+  {
+    OK,
+    ERROR,
+    UNKNOWN
+  };
+
+  // user's request echo-reply
+  QByteArray request;
+  // answer's data
+  QList<QByteArray> data;
+  // status detection flag
+  STATUS status;
+  // status data (typically this is corresponds to status)
+  QByteArray statusData;
+
+};
 
 class PortController : public QObject
 {

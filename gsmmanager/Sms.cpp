@@ -11,11 +11,11 @@ QString smsStorageStr(SMS_STORAGE storage)
 {
   if (storage == SMS_STORAGE_PHONE)
   {
-    return QString(SMS_STORAGE_PHONE_STR);
+    return QString(QChar('"') + QString(SMS_STORAGE_PHONE_STR) + QChar('"'));
   }
   else if (storage == SMS_STORAGE_SIM)
   {
-    return QString(SMS_STORAGE_SIM_STR);
+    return QString(QChar('"') + QString(SMS_STORAGE_SIM_STR) + QChar('"'));
   }
 
   Q_LOGEX(LOG_VERBOSE_ERROR, "Wrong SMS storage specified!");

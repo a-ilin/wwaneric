@@ -4,6 +4,9 @@
 
 #include <QTimer>
 
+const QString statusOk("OK");
+const QString statusError("ERROR");
+
 QList<Conversation> parse(const QByteArray &answer, int &unparsedRestSize)
 {
   // split by \r\n
@@ -17,7 +20,7 @@ QList<Conversation> parse(const QByteArray &answer, int &unparsedRestSize)
   // split by OK or ERROR
   if(splitted.size() > 0)
   {
-    Conversation conversation;
+    QList<QByteArray> data;
 
     foreach(const QByteArray & array, splitted)
     {
@@ -25,13 +28,13 @@ QList<Conversation> parse(const QByteArray &answer, int &unparsedRestSize)
 
       const QString arrayStr(array);
 
-      if ( (arrayStr == QString("OK")) || (arrayStr == QString("ERROR")) )
+      if ( (arrayStr == statusOk) || (arrayStr == statusError) )
       {
-        conversation.append(array);
+        data.append(array);
 
         // detect echo reply (enabled by default or ATE1)
         {
-          QByteArray & first = conversation.first();
+          QByteArray & first = data.first();
 
           int posCr = first.indexOf('\r');
           if (posCr != -1)
@@ -44,25 +47,39 @@ QList<Conversation> parse(const QByteArray &answer, int &unparsedRestSize)
             }
             else // first.size() == posCr + 1
             {
-              conversation.takeFirst();
+              data.takeFirst();
             }
 
-            conversation.prepend(echoReply);
+            data.prepend(echoReply);
           }
         }
 
-        conversations.append(conversation);
-        conversation.clear();
+        Conversation conv;
+        if (data.size() >= 2)
+        {
+          conv.statusData = data.takeLast();
+          conv.status = QString(conv.statusData) == statusOk ? Conversation::OK : Conversation::ERROR;
+          conv.request = data.takeFirst();
+        }
+        else
+        {
+          conv.status = Conversation::UNKNOWN;
+        }
+
+        conv.data = data;
+
+        conversations.append(conv);
+        data.clear();
         unparsedRestSize = 0;
       }
       else if (array != phraseSep)
       {
-        conversation.append(array);
+        data.append(array);
       }
     }
 
     // eat last separator
-    if ((!conversation.size()) && (unparsedRestSize == phraseSep.size()))
+    if ((!data.size()) && (unparsedRestSize == phraseSep.size()))
     {
       unparsedRestSize = 0;
     }
@@ -316,32 +333,25 @@ bool PortController::parseBuffer()
   {
     foreach(const Conversation &c, conversations)
     {
-      // the first is the echo reply
-      // the last is the status OK/ERROR
-      if (c.size() >= 2)
+      if (c.status != Conversation::OK)
       {
-        QByteArray request(c.first());
-        QByteArray status(c.last());
-
-        if (status != "OK")
+        if (c.status == Conversation::ERROR)
         {
-          if (status == "ERROR")
-          {
-            QString str = QString("Received ERROR status for request %1")
-                          .arg(QString(request));
-            Q_LOGEX(LOG_VERBOSE_ERROR, str);
-          }
-          else
-          {
-            QString str = QString("Received unknown status %1 for request %2")
-                          .arg(QString(status)).arg(QString(request));
-            Q_LOGEX(LOG_VERBOSE_ERROR, str);
-          }
-
-          continue;
+          QString str = QString("Received ERROR status for request %1")
+                        .arg(QString(c.request));
+          Q_LOGEX(LOG_VERBOSE_ERROR, str);
         }
+        else
+        {
+          QString str = QString("Received unknown status %1 for request %2")
+                        .arg(QString(c.statusData)).arg(QString(c.request));
+          Q_LOGEX(LOG_VERBOSE_ERROR, str);
+        }
+      }
 
-        if ((request == "*EMRDY: 1") || (request == "AT"))
+      if ((c.request == "*EMRDY: 1") || (c.request == "AT"))
+      {
+        if (c.status == Conversation::OK)
         {
           if (m_modemDetected)
           {
@@ -353,24 +363,19 @@ bool PortController::parseBuffer()
           m_modemDetected = true;
           emit updatedPortStatus(true);
         }
-        else if (m_modemDetected)
+      }
+      else if (m_modemDetected)
+      {
+        if (processConversation(c))
         {
-          if (processConversation(c))
-          {
-            m_portControllerStatus = PORT_CONTROLLER_STATUS_READY;
-          }
-        }
-        else
-        {
-          QString err = QString("Received request %1 but modem was not detected!")
-                        .arg(QString(request));
-          Q_LOGEX(LOG_VERBOSE_ERROR, err);
+          m_portControllerStatus = PORT_CONTROLLER_STATUS_READY;
         }
       }
       else
       {
-        QString str = QString("Received request size is too small: %1").arg(c.size());
-        Q_LOGEX(LOG_VERBOSE_WARNING, str);
+        QString err = QString("Received request %1 but modem was not detected!")
+                      .arg(QString(c.request));
+        Q_LOGEX(LOG_VERBOSE_ERROR, err);
       }
     }
   }

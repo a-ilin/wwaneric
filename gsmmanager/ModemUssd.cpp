@@ -12,28 +12,42 @@ bool UssdConversationHandler::processConversation(ModemRequest *request, const C
 
   if (requestType == USSD_REQUEST_SEND)
   {
-    bool decoded = true;
-    QStringList headerLine = parseAnswerLine(c.at(1), "+CUSD:");
-    if (headerLine.size() > 1)
+    if (c.status == Conversation::OK)
     {
-      SAFE_CONVERT(int, toInt, iStatus, headerLine.at(0), decoded=false;);
-      if (decoded && checkUssdStatus(iStatus))
+      if (c.data.size() > 0)
       {
-        USSD_STATUS status = (USSD_STATUS)iStatus;
-        QString answer = headerLine.at(1);
-        emit updatedUssd(answer, status);
-        success = true;
-        requestFinished = true;
+        bool decoded = true;
+        QStringList headerLine = parseAnswerLine(c.data.first(), "+CUSD:");
+        if (headerLine.size() > 1)
+        {
+          SAFE_CONVERT(int, toInt, iStatus, headerLine.at(0), decoded=false;);
+          if (decoded && checkUssdStatus(iStatus))
+          {
+            USSD_STATUS status = (USSD_STATUS)iStatus;
+            QString answer = headerLine.at(1);
+            emit updatedUssd(answer, status);
+            success = true;
+            requestFinished = true;
+          }
+          else
+          {
+            QString err = QString("Wrong USSD status received: %1").arg(headerLine.at(0));
+            Q_LOGEX(LOG_VERBOSE_ERROR, err);
+          }
+        }
+        else
+        {
+          Q_LOGEX(LOG_VERBOSE_ERROR, "Header size is too small!");
+        }
       }
       else
       {
-        QString err = QString("Wrong USSD status received: %1").arg(headerLine.at(0));
-        Q_LOGEX(LOG_VERBOSE_ERROR, err);
+        Q_LOGEX(LOG_VERBOSE_ERROR, "Answer data is empty!");
       }
     }
     else
     {
-      Q_LOGEX(LOG_VERBOSE_ERROR, "Header size is not more then to 1!");
+      // notify user about error // emit...
     }
   }
 

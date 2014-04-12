@@ -14,29 +14,32 @@ bool StatusConversationHandler::processConversation(ModemRequest *request, const
 
   bool success = false;
 
-  if (requestType == STATUS_REQUEST_MANUFACTURER_INFO)
+  if ((c.data.size() > 0) && (c.status == Conversation::OK))
   {
-    emit updatedManufacturerInfo(c.at(1));
-    success = true;
-    requestFinished = true;
-  }
-  else if (requestType == STATUS_REQUEST_MODEL_INFO)
-  {
-    emit updatedModelInfo(c.at(1));
-    success = true;
-    requestFinished = true;
-  }
-  else if (requestType == STATUS_REQUEST_SERIAL_NUMBER)
-  {
-    emit updatedSerialNumberInfo(c.at(1));
-    success = true;
-    requestFinished = true;
-  }
-  else if (requestType == STATUS_REQUEST_REVISION_INFO)
-  {
-    emit updatedRevisionInfo(c.at(1));
-    success = true;
-    requestFinished = true;
+    if (requestType == STATUS_REQUEST_MANUFACTURER_INFO)
+    {
+      emit updatedManufacturerInfo(c.data.first());
+      success = true;
+      requestFinished = true;
+    }
+    else if (requestType == STATUS_REQUEST_MODEL_INFO)
+    {
+      emit updatedModelInfo(c.data.first());
+      success = true;
+      requestFinished = true;
+    }
+    else if (requestType == STATUS_REQUEST_SERIAL_NUMBER)
+    {
+      emit updatedSerialNumberInfo(c.data.first());
+      success = true;
+      requestFinished = true;
+    }
+    else if (requestType == STATUS_REQUEST_REVISION_INFO)
+    {
+      emit updatedRevisionInfo(c.data.first());
+      success = true;
+      requestFinished = true;
+    }
   }
 
   return success;

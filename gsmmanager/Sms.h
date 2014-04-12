@@ -7,8 +7,8 @@
 #include "Database.h"
 
 // from ST-Ericcsson docs
-#define SMS_STORAGE_SIM_STR "\"SM\""
-#define SMS_STORAGE_PHONE_STR "\"ME\""
+#define SMS_STORAGE_SIM_STR "SM"
+#define SMS_STORAGE_PHONE_STR "ME"
 
 enum SMS_STORAGE
 {

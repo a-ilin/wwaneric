@@ -57,7 +57,7 @@ QStringList parseAnswerLine(const QString &line, const QString &command)
       bool syntaxOk = true;
 
       // insert quoted into line parts
-      for(int i=0; i< quoteIndexes.size() / 2; ++i)
+      for(int i=0; i< quoteIndexes.size()-1; i+=2)
       {
         int openIndex = quoteIndexes.at(i);
         int closeIndex = quoteIndexes.at(i+1);
@@ -105,7 +105,7 @@ QStringList parseAnswerLine(const QString &line, const QString &command)
             part.start = previousEnd + 1;
             part.size = quotedIndex - previousEnd - 1;
             part.string = midLine.mid(part.start ? part.start + 1 : part.start,
-                                      quotedIndex - part.start);
+                                      quotedIndex - part.start - 1);
 
             partsNotQuoted.insert(part.start, part);
           }
@@ -242,51 +242,36 @@ bool Modem::processConversation(const Conversation &c)
   // conversation processed and corresponding request should be removed
   bool requestProcessed = false;
 
-  if (c.size() >= 2)
+  if (requestData() == c.request)
   {
-    QByteArray answerHeader(c.first());
+    ModemRequest *request = m_requests.first();
+    int requestBaseTypeOffset = request->baseType;
+    ConversationHandler * handler = m_conversationHandlers.value(requestBaseTypeOffset);
 
-    // echo reply has \r at the end
-    if (answerHeader.at(answerHeader.size() - 1) == '\r')
+    if (handler)
     {
-      answerHeader.remove(answerHeader.size() - 2, 1);
-    }
-
-    if (requestData() == answerHeader)
-    {
-      ModemRequest *request = m_requests.first();
-      int requestBaseTypeOffset = request->baseType;
-      ConversationHandler * handler = m_conversationHandlers.value(requestBaseTypeOffset);
-
-      if (handler)
+      success = handler->processConversation(request, c, requestProcessed);
+      if (!success)
       {
-        success = handler->processConversation(request, c, requestProcessed);
-        if (!success)
-        {
-          QString str = QString("Unprocessed answer received. Request: %1. Answer: %2")
-                        .arg(QString(requestData()))
-                        .arg(QString(answerHeader));
-          Q_LOGEX(LOG_VERBOSE_CRITICAL, str);
-        }
-      }
-      else
-      {
-        QString err = QString("Handler for this kind of request was unregistered! Request: %1")
-                      .arg(QString(requestData()));
-        Q_LOGEX(LOG_VERBOSE_CRITICAL, err);
+        QString str = QString("Unprocessed answer received. Request: %1. Answer: %2")
+                      .arg(QString(requestData()))
+                      .arg(QString(c.request));
+        Q_LOGEX(LOG_VERBOSE_CRITICAL, str);
       }
     }
     else
     {
-      QString str = QString("Unexpected answer received. Request: %1. Answer: %2")
-                    .arg(QString(requestData()))
-                    .arg(QString(answerHeader));
-      Q_LOGEX(LOG_VERBOSE_CRITICAL, str);
+      QString err = QString("Handler for this kind of request was unregistered! Request: %1")
+                    .arg(QString(requestData()));
+      Q_LOGEX(LOG_VERBOSE_CRITICAL, err);
     }
   }
   else
   {
-    Q_LOGEX(LOG_VERBOSE_WARNING, "Too small conversation received!");
+    QString str = QString("Unexpected answer received. Request: %1. Answer: %2")
+                  .arg(QString(requestData()))
+                  .arg(QString(c.request));
+    Q_LOGEX(LOG_VERBOSE_CRITICAL, str);
   }
 
   if (requestProcessed)
