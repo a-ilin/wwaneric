@@ -1,5 +1,8 @@
 ﻿#include "common.h"
 
+#include <QByteArray>
+#include <QList>
+#include <QString>
 
 QList<QByteArray> splitByteArray(const QByteArray &array,
                                  const QByteArray &sep,
@@ -73,3 +76,26 @@ QList<QByteArray> splitByteArray(const QByteArray &array,
   return splitted;
 }
 
+
+
+QString hexString(const QByteArray& data)
+{
+  QString str;
+  for(int i=0; i< data.size(); ++i)
+  {
+    str += QString::number(data.constData()[i], 16) + QChar(' ');
+  }
+  return str;
+}
+
+QString hexString(const QList<QByteArray>& listData)
+{
+  QString str;
+  int n = 0;
+  foreach(const QByteArray & data, listData)
+  {
+    ++n;
+    str += QString::number(n) + QString(". ") + hexString(data) + ENDL;
+  }
+  return str;
+}

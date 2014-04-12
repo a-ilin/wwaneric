@@ -19,7 +19,7 @@ struct UssdArgs : public RequestArgs
   USSD_SEND_STATUS status;
 };
 
-class UssdConversationHandler : public ConversationHandler
+class UssdConversationHandler : public ConversationHandler, public UnexpectedDataHandler
 {
   Q_OBJECT
 
@@ -28,6 +28,8 @@ public:
   QByteArray requestData(const ModemRequest *request) const;
   int requestTypesCount() const;
   QString name() const;
+
+  bool processUnexpectedData(const QByteArray& data);
 
 public slots:
   void sendUssd(const QString &ussd, USSD_SEND_STATUS status);

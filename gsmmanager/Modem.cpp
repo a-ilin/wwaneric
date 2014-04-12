@@ -172,6 +172,15 @@ Modem::Modem() :
 
 Modem::~Modem()
 {
+  if (m_conversationHandlers.size() > 0)
+  {
+    Q_LOGEX(LOG_VERBOSE_CRITICAL, "There is a conversation handler still registered!");
+  }
+
+  if (m_unexpectedDataHandlers.size() > 0)
+  {
+    Q_LOGEX(LOG_VERBOSE_CRITICAL, "There is an unexpected data handler still registered!");
+  }
 }
 
 void Modem::registerConversationHandler(ConversationHandler *handler)
@@ -222,6 +231,36 @@ void Modem::unregisterConversationHandler(ConversationHandler *handler)
   }
 }
 
+void Modem::registerUnexpectedDataHandler(UnexpectedDataHandler* handler)
+{
+  if (!handler)
+  {
+    Q_LOGEX(LOG_VERBOSE_CRITICAL, "Null pointer passed!");
+    return;
+  }
+
+  if (!m_unexpectedDataHandlers.contains(handler))
+  {
+    m_unexpectedDataHandlers.append(handler);
+  }
+}
+
+void Modem::unregisterUnexpectedDataHandler(UnexpectedDataHandler* handler)
+{
+  if (!handler)
+  {
+    Q_LOGEX(LOG_VERBOSE_CRITICAL, "Null pointer passed!");
+    return;
+  }
+
+  int removed = m_unexpectedDataHandlers.removeAll(handler);
+
+  if(!removed)
+  {
+    Q_LOGEX(LOG_VERBOSE_CRITICAL, "Handler was not registered!");
+  }
+}
+
 void Modem::appendRequest(ModemRequest *request)
 {
   m_requests.append(request);
@@ -251,12 +290,37 @@ bool Modem::processConversation(const Conversation &c)
     if (handler)
     {
       success = handler->processConversation(request, c, requestProcessed);
+
+      if (c.status == Conversation::OK)
+      {
+        if (!success)
+        {
+          QString str = QString("Unprocessed answer received. " ENDL
+                                "Request:"      ENDL
+                                "%1."           ENDL
+                                "Answer (HEX):" ENDL
+                                "%2"
+                                "Status:"       ENDL
+                                "%3"            ENDL)
+                        .arg(QString(c.request))
+                        .arg(hexString(c.data))
+                        .arg(QString(c.statusData));
+          Q_LOGEX(LOG_VERBOSE_ERROR, str);
+        }
+      }
+
       if (!success)
       {
-        QString str = QString("Unprocessed answer received. Request: %1. Answer: %2")
-                      .arg(QString(requestData()))
-                      .arg(QString(c.request));
-        Q_LOGEX(LOG_VERBOSE_CRITICAL, str);
+        --request->retryCount;
+        Q_ASSERT(request->retryCount >= 0);
+
+        // remove request with ended retries
+        if (!request->retryCount)
+        {
+          requestProcessed = true;
+          success = true;
+          Q_LOGEX(LOG_VERBOSE_NOTIFICATION, "Request retry count is ended. Request removed from queue.");
+        }
       }
     }
     else
@@ -271,7 +335,7 @@ bool Modem::processConversation(const Conversation &c)
     QString str = QString("Unexpected answer received. Request: %1. Answer: %2")
                   .arg(QString(requestData()))
                   .arg(QString(c.request));
-    Q_LOGEX(LOG_VERBOSE_CRITICAL, str);
+    Q_LOGEX(LOG_VERBOSE_ERROR, str);
   }
 
   if (requestProcessed)
@@ -280,6 +344,24 @@ bool Modem::processConversation(const Conversation &c)
   }
 
   return success;
+}
+
+bool Modem::processUnexpectedData(const QByteArray& data)
+{
+  bool result = false;
+
+  for(int i=0; (i< m_unexpectedDataHandlers.size()) && (!result); ++i)
+  {
+    result = m_unexpectedDataHandlers.at(i)->processUnexpectedData(data);
+  }
+
+  if (!result)
+  {
+    QString str = QString("Unexpected data was not processed: %1").arg(QString(data));
+    Q_LOGEX(LOG_VERBOSE_WARNING, str);
+  }
+
+  return result;
 }
 
 QByteArray Modem::requestData() const

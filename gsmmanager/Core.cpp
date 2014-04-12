@@ -29,7 +29,7 @@ bool Core::init()
     int status = startLogging();
     if (status)
     {
-        wprintf(L"Error initializing pthread_mutex_t! pthread_mutex_init code: %d. Terminating...\n", status);
+        wprintf(L"Error initializing pthread_mutex_t! pthread_mutex_init code: %d. Terminating..." ENDL, status);
         return -1;
     }
     logFilePath = (appUserDirectory() + QDir::separator() + QString("gsmmanager.log")).toLocal8Bit().constData();
@@ -80,6 +80,8 @@ bool Core::init()
     UssdConversationHandler * ussdHandler = new UssdConversationHandler();
     modem->registerConversationHandler(ussdHandler);
     handlersHash.insert(ussdHandler->name(), ussdHandler);
+    modem->registerUnexpectedDataHandler(ussdHandler);
+    m_unexpectedDataHandlers.insert(modem.data(), ussdHandler);
 
     m_conversationHandlers.insert(modem.data(), handlersHash);
   }
@@ -90,21 +92,35 @@ bool Core::init()
 bool Core::tini()
 {
   // conversation handlers
-  ConversationHandlersModemHash::iterator iter = m_conversationHandlers.begin();
-  while(iter != m_conversationHandlers.constEnd())
   {
-    Modem * modem = iter.key();
-
-    ConversationHandlersHash::iterator iterHandlers = iter.value().begin();
-    while (iterHandlers != iter.value().constEnd())
+    ConversationHandlersModemHash::iterator iter = m_conversationHandlers.begin();
+    while(iter != m_conversationHandlers.constEnd())
     {
-      ConversationHandler * cHandler = iterHandlers.value();
-      modem->unregisterConversationHandler(cHandler);
-      delete cHandler;
-      iterHandlers = iter.value().erase(iterHandlers);
-    }
+      Modem * modem = iter.key();
 
-    iter = m_conversationHandlers.erase(iter);
+      ConversationHandlersHash::iterator iterHandlers = iter.value().begin();
+      while (iterHandlers != iter.value().constEnd())
+      {
+        ConversationHandler * cHandler = iterHandlers.value();
+        modem->unregisterConversationHandler(cHandler);
+        delete cHandler;
+        iterHandlers = iter.value().erase(iterHandlers);
+      }
+
+      iter = m_conversationHandlers.erase(iter);
+    }
+  }
+
+  // unexpected data handlers
+  {
+    UnexpectedDataHandlerModemHash::iterator iter = m_unexpectedDataHandlers.begin();
+    while(iter != m_unexpectedDataHandlers.constEnd())
+    {
+      Modem * modem = iter.key();
+      UnexpectedDataHandler * handler = iter.value();
+      modem->unregisterUnexpectedDataHandler(handler);
+      iter = m_unexpectedDataHandlers.erase(iter);
+    }
   }
 
   // modems
@@ -118,7 +134,7 @@ bool Core::tini()
     int status = stopLogging();
     if (status)
     {
-        wprintf(L"Error deinitializing pthread_mutex_t! pthread_mutex_destroy code: %d. Terminating...\n", status);
+        wprintf(L"Error deinitializing pthread_mutex_t! pthread_mutex_destroy code: %d. Terminating..." ENDL, status);
         return false;
     }
   }

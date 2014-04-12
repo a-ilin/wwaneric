@@ -79,6 +79,12 @@ QString UssdConversationHandler::name() const
   return QString(USSD_HANDLER_NAME);
 }
 
+bool UssdConversationHandler::processUnexpectedData(const QByteArray& data)
+{
+
+  return true;
+}
+
 void UssdConversationHandler::sendUssd(const QString &ussd, USSD_SEND_STATUS status)
 {
   UssdArgs * ussdArgs = static_cast<UssdArgs*> (requestArgs());

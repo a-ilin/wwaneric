@@ -20,18 +20,21 @@
 #endif
 
 
-
-
-
-
 // enable logging
 #define LOG_ENABLED
 #define LOG_USE_PTHREADS
 #include "log.h"
 
+// line ending
+#ifdef F_OS_WINDOWS
+#define ENDL "\r\n"
+#else
+#define ENDL "\n"
+#endif
 
-
-
+// returns data as a HEX formatted string
+QString hexString(const QByteArray & data);
+QString hexString(const QList<QByteArray> & listData);
 
 // QVariant safe convertion macro
 #define SAFE_CONVERT(type, vtype, name, variant, bad_command) \

@@ -12,6 +12,13 @@ QStringList parseAnswerLine(const QString &line, const QString &command);
 class ConversationHandler;
 class Modem;
 
+class UnexpectedDataHandler
+{
+public:
+
+  virtual bool processUnexpectedData(const QByteArray& data) = 0;
+};
+
 struct RequestArgs
 {
   virtual ~RequestArgs() {}
@@ -19,10 +26,11 @@ struct RequestArgs
 
 struct ModemRequest
 {
-  ModemRequest(int btype, int type, RequestArgs* args = NULL) :
+  ModemRequest(int btype, int type, RequestArgs* args = NULL, int _retryCount = 1) :
     requestType(type),
     requestArgs(args),
     requestStage(0),
+    retryCount(_retryCount),
     baseType(btype)
   {}
 
@@ -34,9 +42,14 @@ struct ModemRequest
     }
   }
 
+  // type
   int requestType;
+  // arguments
   RequestArgs *requestArgs;
+  // stage
   int requestStage;
+  // retry count in case of error, if 0 request will not be processed
+  int retryCount;
 
 private:
   // base type offset for conversation handler
@@ -116,14 +129,15 @@ public:
   void registerConversationHandler(ConversationHandler * handler);
   void unregisterConversationHandler(ConversationHandler * handler);
 
+  void registerUnexpectedDataHandler(UnexpectedDataHandler * handler);
+  void unregisterUnexpectedDataHandler(UnexpectedDataHandler * handler);
+
 public slots:
   void appendRequest(ModemRequest *request);
 
 protected:
-  // return true if conversation was recognized and successfully processed
   bool processConversation(const Conversation & c);
-
-  // return raw data for request from queue
+  bool processUnexpectedData(const QByteArray& data);
   QByteArray requestData() const;
 
 private:
@@ -131,6 +145,7 @@ private:
 
   // key is baseRequestOffset
   QMap<int, ConversationHandler*> m_conversationHandlers;
+  QList<UnexpectedDataHandler*> m_unexpectedDataHandlers;
 
 };
 

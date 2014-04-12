@@ -182,7 +182,9 @@ protected:
 
 size_t null_wcodecvt::m_refs = 0;
 
+// line endings
 #ifdef F_OS_WINDOWS
+#define ENDL "\r\n"
 std::wostream& wendl(std::wostream& out)
 {
   out.put(L'\r');
@@ -191,6 +193,7 @@ std::wostream& wendl(std::wostream& out)
   return out;
 }
 #else
+#define ENDL "\n"
 std::wostream& wendl(std::wostream& out)
 {
   out.put(L'\n');
@@ -249,7 +252,7 @@ void LogRaw(const std::wstring &str)
 
     if (output.fail())
     {
-        wprintf(L"Error opening log file for logging: %s\n", logFilePath.c_str());
+        wprintf(L"Error opening log file for logging: %s" ENDL, logFilePath.c_str());
         return;
     }
 
@@ -287,7 +290,7 @@ void WriteLogEx(LOG_VERBOSE verbose, const wchar_t * position, const wchar_t * m
   mutexResult = pthread_mutex_lock(&logMutex);
   if (mutexResult)
   {
-    wprintf(L"Cannot lock pthread log mutex! Logging message skipped! File: %s, Line: %s\n", WIDEN(__FILE__), WIDEN(STRINGIFY(__LINE__)));
+    wprintf(L"Cannot lock pthread log mutex! Logging message skipped! File: %s, Line: %s" ENDL, WIDEN(__FILE__), WIDEN(STRINGIFY(__LINE__)));
     return;
   }
 #endif
@@ -347,8 +350,8 @@ void WriteLogEx(LOG_VERBOSE verbose, const wchar_t * position, const wchar_t * m
                             now->tm_min,
                             now->tm_sec,
                             tv.tv_usec / 1000,
-                            position,
                             verboseStr.c_str(),
+                            position,
                             message);
     }
 
@@ -361,7 +364,7 @@ void WriteLogEx(LOG_VERBOSE verbose, const wchar_t * position, const wchar_t * m
         errMsg = L"Illegal multibyte character sequence";
       }
 
-      wprintf(L"Message formatting error occured: \"%s\". @: %s:%d\n", errMsg.c_str(), WIDEN(__FILE__), __LINE__);
+      wprintf(L"Message formatting error occured: \"%s\". @: %s:%d" ENDL, errMsg.c_str(), WIDEN(__FILE__), __LINE__);
       perror(NULL);
 
       return;
@@ -385,7 +388,7 @@ void WriteLogEx(LOG_VERBOSE verbose, const wchar_t * position, const wchar_t * m
   mutexResult = pthread_mutex_unlock(&logMutex);
   if (mutexResult)
   {
-    wprintf(L"Cannot unlock pthread log mutex! This is the problem! File: %s, Line: %s\n", WIDEN(__FILE__), WIDEN(STRINGIFY(__LINE__)));
+    wprintf(L"Cannot unlock pthread log mutex! This is the problem! File: %s, Line: %s" ENDL, WIDEN(__FILE__), WIDEN(STRINGIFY(__LINE__)));
     return;
   }
 #endif

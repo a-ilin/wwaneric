@@ -63,7 +63,8 @@ signals:
 protected:
   // return true if conversation was recognized and successfully processed
   virtual bool processConversation(const Conversation & c) = 0;
-
+  // return true if unexpected modem data has been processed
+  virtual bool processUnexpectedData(const QByteArray& data) = 0;
   // return raw data for request from queue
   virtual QByteArray requestData() const = 0;
 
@@ -96,7 +97,8 @@ private:
   enum PORT_CONTROLLER_STATUS
   {
     PORT_CONTROLLER_STATUS_READY,
-    PORT_CONTROLLER_STATUS_BUSY
+    PORT_CONTROLLER_STATUS_PROCESS_REQUEST,
+    PORT_CONTROLLER_STATUS_PROCESS_UNEXPECTED_DATA
   } m_portControllerStatus;
 
   // modem detected on specified port

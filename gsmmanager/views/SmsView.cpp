@@ -134,16 +134,16 @@ void SmsView::updateSmsCapacity(int simUsed, int simTotal, int phoneUsed, int ph
 void SmsView::fillSmsTextAndTooltip(Sms * sms, QString * smsText, QString * smsTooltip) const
 {
   *smsText =
-      tr("Timestamp: ") + sms->dateTime().toString() + QString("\n") +
-      tr("From: ") + sms->sender() + QString("\n") +
+      tr("Timestamp: ") + sms->dateTime().toString() + QString(ENDL) +
+      tr("From: ") + sms->sender() + QString(ENDL) +
       sms->userText()
    ;
 
   *smsTooltip =
-      tr("SMSC: ") + sms->smsc() + QString("\n") +
-      tr("Storage: ") + (sms->storage() == SMS_STORAGE_SIM ? tr("SIM") : tr("Phone")) + QString("\n") +
-      tr("Index: ") + QString::number(sms->index()) + QString("\n") +
-      tr("UDH type: ") + sms->udhType() + QString("\n")
+      tr("SMSC: ") + sms->smsc() + QString(ENDL) +
+      tr("Storage: ") + (sms->storage() == SMS_STORAGE_SIM ? tr("SIM") : tr("Phone")) + QString(ENDL) +
+      tr("Index: ") + QString::number(sms->index()) + QString(ENDL) +
+      tr("UDH type: ") + sms->udhType() + QString(ENDL)
       ;
 }
 
@@ -181,15 +181,15 @@ void SmsView::appendSms(const QList<Sms> &smsList)
   foreach(const Sms &sms, smsList)
   {
     QString smsText =
-        tr("Timestamp: ") + sms.dateTime().toString() + QString("\n") +
-        tr("From: ") + sms.sender() + QString("\n") +
+        tr("Timestamp: ") + sms.dateTime().toString() + QString(ENDL) +
+        tr("From: ") + sms.sender() + QString(ENDL) +
         sms.userText();
 
     QString smsTooltip =
-        tr("SMSC: ") + sms.smsc() + QString("\n") +
-        tr("Storage: ") + (sms.storage() == SMS_STORAGE_SIM ? tr("SIM") : tr("Phone")) + QString("\n") +
-        tr("Index: ") + QString::number(sms.index()) + QString("\n") +
-        tr("UDH type: ") + sms.udhType() + QString("\n");
+        tr("SMSC: ") + sms.smsc() + QString(ENDL) +
+        tr("Storage: ") + (sms.storage() == SMS_STORAGE_SIM ? tr("SIM") : tr("Phone")) + QString(ENDL) +
+        tr("Index: ") + QString::number(sms.index()) + QString(ENDL) +
+        tr("UDH type: ") + sms.udhType() + QString(ENDL);
 
     QListWidgetItem *smsItem = new QListWidgetItem(smsText);
     QVariant smsOverlay;

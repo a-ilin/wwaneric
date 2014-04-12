@@ -35,6 +35,9 @@ private:
   typedef QHash<Modem*,  ConversationHandlersHash> ConversationHandlersModemHash;
   ConversationHandlersModemHash m_conversationHandlers;
 
+  typedef QHash<Modem*, UnexpectedDataHandler*> UnexpectedDataHandlerModemHash;
+  UnexpectedDataHandlerModemHash m_unexpectedDataHandlers;
+
   Q_DISABLE_COPY(Core)
 };
 

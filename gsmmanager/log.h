@@ -68,7 +68,7 @@ void WriteLog(const wchar_t * message);
             std::wstringstream _msg; \
             _msg << L"MSGID:$" << WIDEN(TOSTRING(__COUNTER__)) << L"$ " \
                  << WIDEN(__FILE__) << L":" << WIDEN(TOSTRING(__LINE__)) \
-                 << L" @ " << __PRETTY_FUNCTION__ << L":"; \
+                 << L" @ " << __PRETTY_FUNCTION__ << L": "; \
             WriteLogEx(VERBOSITY, _msg.str().data(), MESSAGEFMT); \
         }
 

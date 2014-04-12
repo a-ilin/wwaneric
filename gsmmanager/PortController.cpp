@@ -177,14 +177,7 @@ void PortController::onReadyRead()
 
   // debug logging
   {
-    QString hexString;
-    for(int i=0; i< data.size(); ++i)
-    {
-      hexString += QString::number(data.constData()[i], 16) + QChar(' ');
-    }
-
-    QString debugString(QString("Read:\nHEX: ") + hexString + QChar('\n') + QString(data));
-
+    QString debugString(QString("Read:" ENDL "HEX: ") + hexString(data) + QString(ENDL) + QString(data));
     Q_LOGEX(LOG_VERBOSE_DEBUG, debugString);
   }
 
@@ -248,7 +241,7 @@ void PortController::onReadChannelFinished()
 
 void PortController::onTimerTimeout()
 {
-  Q_LOGEX(LOG_VERBOSE_ERROR, "Request timeout. Clearing received buffer.");
+  Q_LOGEX(LOG_VERBOSE_ERROR, "Timeout. Clearing received buffer.");
 
   m_bufferReceived.clear();
   m_portControllerStatus = PORT_CONTROLLER_STATUS_READY;
@@ -268,14 +261,7 @@ void PortController::sendToPort(const QByteArray &data)
 {
   // debug logging
   {
-    QString hexString;
-    for(int i=0; i< data.size(); ++i)
-    {
-      hexString += QString::number(data.constData()[i], 16) + QChar(' ');
-    }
-
-    QString debugString(QString("Write:\nHEX: ") + hexString + QChar('\n') + QString(data));
-
+    QString debugString(QString("Write:" ENDL "HEX: ") + hexString(data) + QString(ENDL) + QString(data));
     Q_LOGEX(LOG_VERBOSE_DEBUG, debugString);
   }
 
@@ -292,45 +278,58 @@ void PortController::sendToPort(const QByteArray &data)
 
 void PortController::sendRequest(const QByteArray &request)
 {
-  if (m_serialPort->isOpen())
+  if ((m_portControllerStatus == PORT_CONTROLLER_STATUS_READY) && m_serialPort->isOpen())
   {
     QByteArray data = request;
-    if ((m_portControllerStatus == PORT_CONTROLLER_STATUS_READY) &&
-        (data.size() > 0))
+    if (data.size() > 0)
     {
       data.append("\r\n");
       sendToPort(data);
-      m_portControllerStatus = PORT_CONTROLLER_STATUS_BUSY;
+      m_portControllerStatus = PORT_CONTROLLER_STATUS_PROCESS_REQUEST;
     }
   }
 }
 
 void PortController::sendRequest()
 {
-  sendRequest(requestData());
+  if (m_portControllerStatus == PORT_CONTROLLER_STATUS_READY)
+  {
+    sendRequest(requestData());
+  }
 }
 
 bool PortController::parseBuffer()
 {
-  int restSize = 0;
-  const QList<Conversation> conversations = parse(m_bufferReceived, restSize);
-  if (restSize)
+  if ((m_portControllerStatus == PORT_CONTROLLER_STATUS_READY) ||
+      (m_portControllerStatus == PORT_CONTROLLER_STATUS_PROCESS_UNEXPECTED_DATA))
   {
-    m_bufferReceived.remove(0, m_bufferReceived.size() - restSize);
+    if (m_modemDetected)
+    {
+      if (!processUnexpectedData(m_bufferReceived))
+      {
+        m_portControllerStatus = PORT_CONTROLLER_STATUS_PROCESS_UNEXPECTED_DATA;
+      }
+    }
+    else
+    {
+      Q_LOGEX(LOG_VERBOSE_CRITICAL, QString("Received unexpected data %1 but modem was not detected! Clearing buffer.")
+              .arg(QString(m_bufferReceived)));
+      m_bufferReceived.clear();
+    }
   }
   else
   {
-    m_bufferReceived.clear();
-  }
+    int restSize = 0;
+    const QList<Conversation> conversations = parse(m_bufferReceived, restSize);
+    if (restSize)
+    {
+      m_bufferReceived.remove(0, m_bufferReceived.size() - restSize);
+    }
+    else
+    {
+      m_bufferReceived.clear();
+    }
 
-  if (m_portControllerStatus == PORT_CONTROLLER_STATUS_READY)
-  {
-    QString str = QString("Modem status is READY when new data arrived. Clearing data buffer.");
-    Q_LOGEX(LOG_VERBOSE_WARNING, str);
-    m_bufferReceived.clear();
-  }
-  else
-  {
     foreach(const Conversation &c, conversations)
     {
       if (c.status != Conversation::OK)
@@ -343,6 +342,7 @@ bool PortController::parseBuffer()
         }
         else
         {
+          Q_ASSERT(c.status == Conversation::UNKNOWN);
           QString str = QString("Received unknown status %1 for request %2")
                         .arg(QString(c.statusData)).arg(QString(c.request));
           Q_LOGEX(LOG_VERBOSE_ERROR, str);
