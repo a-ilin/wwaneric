@@ -5,6 +5,25 @@
 #include <QList>
 #include <QtGlobal>
 
+
+// set OS flag
+#if defined(Q_OS_WIN) || defined(_WIN16) || \
+    defined(_WIN32) || defined(_WIN64) || \
+    defined (__WIN32__) || defined(__TOS_WIN__) || defined(__WINDOWS__)
+
+#define F_OS_WINDOWS
+
+#else
+
+#define F_OS_UNIX
+
+#endif
+
+
+
+
+
+
 // enable logging
 #define LOG_ENABLED
 #define LOG_USE_PTHREADS

@@ -56,9 +56,8 @@ void WriteLog(const wchar_t * message);
 #define LOGEX(VERBOSITY,MESSAGEFMT) \
         { \
             std::wstringstream _msg; \
-            _msg << L"_FILE_: " WIDEN(__FILE__) L", _LINE_: " WIDEN(TOSTRING(__LINE__)) L", _FUNCTION_: " \
-                << __FUNCTION__ \
-                << L":"; \
+            _msg << WIDEN(__FILE__) << L":" << WIDEN(TOSTRING(__LINE__)) \
+                 << L" @ " << __FUNCTION__ << L":"; \
             WriteLogEx(VERBOSITY, _msg.str().data(), MESSAGEFMT); \
         }
 
