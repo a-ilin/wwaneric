@@ -1,8 +1,18 @@
-﻿//
-// To enable logging put this into CPP/H files:
-// #define LOG_ENABLED
-// #include "log.h"
-//
+﻿/*
+* To enable logging put this into CPP/H files:
+* #define LOG_ENABLED
+* #include "log.h"
+*
+* If you need to log from different threads/processes
+* then add this line before including log.h:
+* #define LOG_USE_PTHREADS
+*
+* At start point call startLogging() and just before exit call stopLogging()
+*
+* To log messages use LOG, LOGEX, or Q_LOGEX macros.
+*
+*/
+
 
 #pragma once
 
@@ -56,8 +66,9 @@ void WriteLog(const wchar_t * message);
 #define LOGEX(VERBOSITY,MESSAGEFMT) \
         { \
             std::wstringstream _msg; \
-            _msg << WIDEN(__FILE__) << L":" << WIDEN(TOSTRING(__LINE__)) \
-                 << L" @ " << __FUNCTION__ << L":"; \
+            _msg << L"MSGID:$" << WIDEN(TOSTRING(__COUNTER__)) << L"$ " \
+                 << WIDEN(__FILE__) << L":" << WIDEN(TOSTRING(__LINE__)) \
+                 << L" @ " << __PRETTY_FUNCTION__ << L":"; \
             WriteLogEx(VERBOSITY, _msg.str().data(), MESSAGEFMT); \
         }
 
@@ -65,7 +76,7 @@ void WriteLog(const wchar_t * message);
 
 // Qt
 #ifdef QT_VERSION
-// Q_MESSAGEFMT is a QString object
+// Q_MESSAGEFMT can be an object that accepted in QString constructor
 #define Q_LOGEX(VERBOSITY,Q_MESSAGEFMT) \
   { \
     QString _str(Q_MESSAGEFMT); \

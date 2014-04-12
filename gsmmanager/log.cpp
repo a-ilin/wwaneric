@@ -337,7 +337,7 @@ void WriteLogEx(LOG_VERBOSE verbose, const wchar_t * position, const wchar_t * m
       struct timeval tv;
       gettimeofday(&tv, NULL);
 
-      std::wstring formatStrPrivate = L"%04d-%02d-%02d %02d:%02d:%02d.%03d @F@ %ls %ls%ls";
+      std::wstring formatStrPrivate = L"%04d-%02d-%02d %02d:%02d:%02d.%03d %ls %ls%ls";
 
       messageLen = swprintf(messageOut, MAX_LOG_MESSAGE_CHARACTERS, formatStrPrivate.c_str(),
                             now->tm_year + 1900,
