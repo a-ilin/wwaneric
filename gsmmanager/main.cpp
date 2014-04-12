@@ -2,10 +2,9 @@
 
 #include <QApplication>
 #include <QDir>
+#include <QIcon>
 #include <QSettings>
 
-
-#include "MainWindow.h"
 #include "Core.h"
 
 
@@ -29,10 +28,6 @@ int main(int argc, char *argv[])
   Core * core = new Core();
   if (core->init())
   {
-    MainWindow w;
-    w.addViewGroup(QString("Default"));
-    w.show();
-
     returnValue = a.exec();
   }
   else

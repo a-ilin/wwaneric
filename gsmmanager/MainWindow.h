@@ -1,6 +1,8 @@
 ﻿#ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
+#include "Settings.h"
+
 #include <QMainWindow>
 #include <QMultiMap>
 
@@ -24,6 +26,12 @@ public:
   void addViewGroup(const QString &groupName);
   void removeViewGroup(const QString &groupName);
 
+  void init();
+  void tini();
+
+  void restore(Settings &set);
+  void store(Settings &set);
+
 protected:
   void changeEvent(QEvent *e);
 
@@ -33,6 +41,7 @@ protected:
 protected slots:
   void containerDestroyed(QObject * obj);
   void updateActionTriggered();
+  void updatedPortStatus(bool opened);
 
 protected:
   Ui::MainWindow *ui;

@@ -44,6 +44,8 @@ private slots:
   void closePortClicked();
   void updatePortStatus(bool opened);
 
+  void defaultCheckBoxStateChanged(int state);
+
 private:
   Ui::SettingsView *ui;
 

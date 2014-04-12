@@ -37,11 +37,11 @@ QString hexString(const QByteArray & data);
 QString hexString(const QList<QByteArray> & listData);
 
 // QVariant safe convertion macro
-#define SAFE_CONVERT(type, vtype, name, variant, bad_command) \
+#define SAFE_CONVERT(type, method, name, variant, bad_command) \
   type name; \
   { \
     bool ok = false; \
-    name = variant.vtype(&ok); \
+    name = variant.method(&ok); \
     if (!ok) \
     { \
       bad_command; \

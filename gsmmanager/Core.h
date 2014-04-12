@@ -8,6 +8,8 @@
 #include <QList>
 #include <QSharedPointer>
 
+class MainWindow;
+
 class Core
 {
 public:
@@ -25,6 +27,8 @@ public:
 
   ConversationHandler* conversationHandler(Modem *modem, const QString &name) const;
 
+  MainWindow * mainWindow() const { return m_mainWindow; }
+
 private:
 
   static Core * m_instance;
@@ -37,6 +41,8 @@ private:
 
   typedef QHash<Modem*, UnexpectedDataHandler*> UnexpectedDataHandlerModemHash;
   UnexpectedDataHandlerModemHash m_unexpectedDataHandlers;
+
+  MainWindow * m_mainWindow;
 
   Q_DISABLE_COPY(Core)
 };

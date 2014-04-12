@@ -1,8 +1,8 @@
 ﻿#include "MainWindow.h"
 #include "ui_MainWindow.h"
 
+#include "Core.h"
 #include "Modem.h"
-#include "Settings.h"
 
 #include "IView.h"
 #include "views/ModemStatusView.h"
@@ -124,6 +124,28 @@ void MainWindow::removeViewGroup(const QString &groupName)
   }
 }
 
+void MainWindow::init()
+{
+  Modem * modem = Core::instance()->modem();
+  connect(modem, SIGNAL(updatedPortStatus(bool)),
+          this, SLOT(updatePortStatus(bool)));
+}
+
+void MainWindow::tini()
+{
+
+}
+
+void MainWindow::restore(Settings& set)
+{
+
+}
+
+void MainWindow::store(Settings& set)
+{
+
+}
+
 void MainWindow::containerDestroyed(QObject *obj)
 {
   QTabWidget * container = static_cast<QTabWidget*>(obj);
@@ -156,6 +178,14 @@ void MainWindow::updateActionTriggered()
     QCoreApplication::postEvent(view->widget(), event);
 
     ++iter;
+  }
+}
+
+void MainWindow::updatedPortStatus(bool opened)
+{
+  if (opened)
+  {
+    updateActionTriggered();
   }
 }
 

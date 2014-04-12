@@ -113,6 +113,19 @@ void PortController::setPortName(const QString &portName)
   m_serialPort->setPortName(portName);
 }
 
+void PortController::setPortOptions(const PortOptions& options)
+{
+  m_options = options;
+}
+
+#define SET_OPTION(option, method) \
+  if (!m_serialPort->method(m_options.option)) \
+  { \
+    Q_LOGEX(LOG_VERBOSE_ERROR, "Error on setting serial port option: " # option ); \
+    onError(m_serialPort->error()); \
+    closePort(); \
+  }
+
 void PortController::openPort()
 {
   // if port opened but modem not found
@@ -139,6 +152,12 @@ void PortController::openPort()
 
     if (m_serialPort->isOpen())
     {
+      SET_OPTION(baudRate,    setBaudRate);
+      SET_OPTION(dataBits,    setDataBits);
+      SET_OPTION(flowControl, setFlowControl);
+      SET_OPTION(parity,      setParity);
+      SET_OPTION(stopBits,    setStopBits);
+
       sendRequest("AT");
     }
     else

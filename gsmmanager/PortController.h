@@ -33,6 +33,28 @@ struct Conversation
 
 };
 
+struct PortOptions
+{
+  PortOptions() :
+    baudRateDefault(true),
+    dataBitsDefault(true),
+    flowControlDefault(true),
+    parityDefault(true),
+    stopBitsDefault(true)
+  {}
+
+  QSerialPort::BaudRate baudRate;
+  bool baudRateDefault;
+  QSerialPort::DataBits dataBits;
+  bool dataBitsDefault;
+  QSerialPort::FlowControl flowControl;
+  bool flowControlDefault;
+  QSerialPort::Parity parity;
+  bool parityDefault;
+  QSerialPort::StopBits stopBits;
+  bool stopBitsDefault;
+};
+
 class PortController : public QObject
 {
   Q_OBJECT
@@ -41,6 +63,7 @@ public:
   PortController();
 
   QString portName() const { return m_serialPort->portName(); }
+  const PortOptions& portOptions() const { return m_options; }
 
 public slots:
   /*
@@ -48,6 +71,7 @@ public slots:
    *
   */
   void setPortName(const QString &portName);
+  void setPortOptions(const PortOptions &options);
   void openPort();
   void closePort();
 
@@ -112,6 +136,9 @@ private:
 
   // timer timeout
   QTimer * m_timerTimeout;
+
+  // serial port options
+  PortOptions m_options;
 };
 
 #endif // PORTCONTROLLER_H
