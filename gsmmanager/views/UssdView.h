@@ -31,6 +31,7 @@ public:
 public slots:
   void sendUssd(const QString &ussd);
   void receivedUssd(const QString &ussdAnswer, USSD_STATUS status);
+  void receivedStatus(USSD_STATUS status);
 
 protected:
   void changeEvent(QEvent *e);

@@ -16,38 +16,28 @@ bool UssdConversationHandler::processConversation(ModemRequest *request, const C
     {
       if (c.data.size() > 0)
       {
-        bool decoded = true;
-        QStringList headerLine = parseAnswerLine(c.data.first(), "+CUSD:");
-        if (headerLine.size() > 1)
+        QString answer;
+        USSD_STATUS status;
+        if (processUssdData(c.data.first(), answer, status))
         {
-          SAFE_CONVERT(int, toInt, iStatus, headerLine.at(0), decoded=false;);
-          if (decoded && checkUssdStatus(iStatus))
-          {
-            USSD_STATUS status = (USSD_STATUS)iStatus;
-            QString answer = headerLine.at(1);
-            emit updatedUssd(answer, status);
-            success = true;
-            requestFinished = true;
-          }
-          else
-          {
-            QString err = QString("Wrong USSD status received: %1").arg(headerLine.at(0));
-            Q_LOGEX(LOG_VERBOSE_ERROR, err);
-          }
-        }
-        else
-        {
-          Q_LOGEX(LOG_VERBOSE_ERROR, "Header size is too small!");
+          emit updatedUssd(answer, status);
+          requestFinished = true;
+          success = true;
         }
       }
       else
       {
         Q_LOGEX(LOG_VERBOSE_ERROR, "Answer data is empty!");
       }
+
+      if (!success)
+      {
+        emit updatedUssd(tr("Cannot parse modem answer"), USSD_STATUS_LAST);
+      }
     }
     else
     {
-      // notify user about error // emit...
+      emit updatedUssd(tr("ERROR"), USSD_STATUS_DIALOGUE_TERMINATED);
     }
   }
 
@@ -81,8 +71,24 @@ QString UssdConversationHandler::name() const
 
 bool UssdConversationHandler::processUnexpectedData(const QByteArray& data)
 {
+  QString msg;
+  USSD_STATUS status;
 
-  return true;
+  if (processUssdData(QString(data), msg, status))
+  {
+    if (msg.size() > 0)
+    {
+      emit updatedUssd(msg, status);
+    }
+    else
+    {
+      emit updatedStatus(status);
+    }
+
+    return true;
+  }
+
+  return false;
 }
 
 void UssdConversationHandler::sendUssd(const QString &ussd, USSD_SEND_STATUS status)
@@ -92,6 +98,33 @@ void UssdConversationHandler::sendUssd(const QString &ussd, USSD_SEND_STATUS sta
   ussdArgs->status = status;
 
   modem()->appendRequest(createEmptyRequest(USSD_REQUEST_SEND, ussdArgs));
+}
+
+bool UssdConversationHandler::processUssdData(const QString& data, QString& msg, USSD_STATUS& status) const
+{
+  bool result = false;
+  QStringList headerLine = parseAnswerLine(data, "+CUSD:");
+  if (headerLine.size() > 1)
+  {
+    bool decoded = true;
+    SAFE_CONVERT(int, toInt, iStatus, headerLine.at(0), decoded=false;);
+    if (decoded && checkUssdStatus(iStatus))
+    {
+      status = (USSD_STATUS)iStatus;
+      msg = headerLine.at(1);
+      result = true;
+    }
+    else
+    {
+      QString err = QString("Wrong USSD status received: %1").arg(headerLine.at(0));
+      Q_LOGEX(LOG_VERBOSE_ERROR, err);
+    }
+  }
+  else
+  {
+    Q_LOGEX(LOG_VERBOSE_ERROR, "Header size is too small!");
+  }
+  return result;
 }
 
 RequestArgs *UssdConversationHandler::requestArgs() const

@@ -63,7 +63,7 @@ void UssdView::init()
       static_cast<UssdConversationHandler*> (Core::instance()->conversationHandler(modem, USSD_HANDLER_NAME));
 
   connect(ussdHandler, SIGNAL(updatedUssd(QString,USSD_STATUS)), SLOT(receivedUssd(QString,USSD_STATUS)));
-
+  connect(ussdHandler, SIGNAL(updatedStatus(USSD_STATUS)), SLOT(receivedStatus(USSD_STATUS)));
 }
 
 void UssdView::tini()
@@ -93,20 +93,26 @@ QString UssdView::name()
 void UssdView::sendUssd(const QString &ussd)
 {
   const QString htmlSent("<html><head/><body><p><span style=\" color:blue;\"> %1 </span></p></body></html>");
-  ui->ussdAnswer->appendHtml(htmlSent.arg(tr("Sent: %1").arg(ussd)));
+  ui->ussdAnswer->appendHtml(htmlSent.arg(tr("Sent:<br>%1").arg(ussd)));
 
   Modem * modem = Core::instance()->modem();
   UssdConversationHandler * ussdHandler =
       static_cast<UssdConversationHandler*> (Core::instance()->conversationHandler(modem, USSD_HANDLER_NAME));
 
+  receivedStatus(USSD_STATUS_USER_ACTION_NEEDED);
   ussdHandler->sendUssd(ussd, USSD_SEND_STATUS_CODE_PRESENTATION_ON);
 }
 
 void UssdView::receivedUssd(const QString &ussdAnswer, USSD_STATUS status)
 {
   const QString htmlReceived("<html><head/><body><p><span style=\" color:red;\"> %1 </span></p></body></html>");
-  ui->ussdAnswer->appendHtml(htmlReceived.arg(tr("Received: \n%1").arg(ussdAnswer)));
+  ui->ussdAnswer->appendHtml(htmlReceived.arg(tr("Received:<br>%1").arg(ussdAnswer)));
 
+  receivedStatus(status);
+}
+
+void UssdView::receivedStatus(USSD_STATUS status)
+{
   QString statusStr;
 
   switch(status)

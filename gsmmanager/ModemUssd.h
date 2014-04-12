@@ -36,6 +36,10 @@ public slots:
 
 signals:
   void updatedUssd(const QString &ussd, USSD_STATUS status);
+  void updatedStatus(USSD_STATUS status);
+
+protected:
+  bool processUssdData(const QString &data, QString &msg, USSD_STATUS &status) const;
 
 protected:
   RequestArgs* requestArgs() const;
