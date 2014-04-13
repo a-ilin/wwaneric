@@ -87,3 +87,15 @@ win32:RC_FILE = gsmmanager.rc
 OTHER_FILES += \
     gsmmanager.rc
 
+
+# Debug windows
+CONFIG(debug, debug|release) {
+HEADERS   += \
+    debugParsers.h
+
+SOURCES   += \
+    debugParsers.cpp
+
+FORMS     += \
+    debugParsers.ui
+}

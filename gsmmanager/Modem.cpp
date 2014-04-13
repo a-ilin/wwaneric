@@ -4,6 +4,7 @@
 
 QEvent::Type ModemEventType = (QEvent::Type)QEvent::registerEventType();
 
+
 /* line should have format:
  * <command>: <data>[,<data>[,<data>[,...]]]
  * where <data> can be one of these types:
@@ -13,150 +14,137 @@ QEvent::Type ModemEventType = (QEvent::Type)QEvent::registerEventType();
 */
 QStringList parseAnswerLine(const QString &line, const QString &command)
 {
-  /* A part of line.
-   * quoted is true if the part was quoted and it's contents shouldn't be parsed for commas
-   * start includes a start comma and quotes (if exists)
-   * length includes a start comma and quotes, (if exists)
-   * string includes only useful data, i.e. it excludes commas and quotes
-  */
-  struct StringPart
+  // check for command
+  int index = line.indexOf(command);
+  if(index != 0)  // line should starts with the command
   {
-    bool quoted;
-    int start;
-    int size;
-    QString string;
+    return QStringList();
+  }
+
+  index = command.size();
+  while((index < line.size()) && (line.at(index) == ' '))
+  {
+    ++index;
+  }
+
+  // a string with cutted command and spaces after it
+  QString midLine = line.mid(index);
+
+  QByteArray sep("\"");
+  QList<QByteArray> splittedQuoted = splitByteArray(midLine.toUtf8(), sep, KeepSeparators);
+
+  // state of current block. if true it was quoted.
+  bool q = false;
+  // count of quotes sequence
+  int qSec = 0;
+  // will contain quoted and not quoted parts
+  struct Part
+  {
+    QByteArray part;
+    bool wasQuoted;
   };
+
+  QList<Part> preResult;
+
+  int partIndex = 0;
+  foreach(const QByteArray &part, splittedQuoted)
+  {
+    if (part == sep)
+    {
+      q = !q;
+      ++qSec;
+
+      // empty string
+      if (qSec == 2)
+      {
+        Part p;
+        p.wasQuoted = true;
+        preResult.append(p);
+      }
+      // error, should be less then 3 ( """ <== is not accepted )
+      if (qSec > 2)
+      {
+        return QStringList();
+      }
+
+      continue;
+    }
+    else
+    {
+      qSec = 0;
+    }
+
+    Part p;
+    p.part = part;
+
+    if (q)
+    {
+      p.wasQuoted = true;
+    }
+    else
+    {
+      p.wasQuoted = false;
+
+      // check that if previous was quoted then ...
+      if (preResult.size() && preResult.last().wasQuoted)
+      {
+        if (!part.size())
+        {
+          QString str("Meet empty part. In current mode this should not happen! Source: \"%1\" Arg: \"%2\"");
+          Q_LOGEX(LOG_VERBOSE_CRITICAL, str.arg(line).arg(command));
+
+          return QStringList();
+        }
+        // the current should starts with comma
+        if (part.at(0) != ',')
+        {
+          return QStringList();
+        }
+      }
+    }
+
+    preResult.append(p);
+
+    ++partIndex;
+  }
+
+  if (q)
+  {
+    // abort
+    return QStringList();
+  }
 
   QStringList result;
 
-  // check for command
-  int index = line.indexOf(command);
-  if(index == 0)  // line should starts with the command
+  for (int index = 0; index < preResult.size(); ++index)
   {
-    index = command.size();
-    while(line.at(index) == ' ')
+    const Part &part = preResult.at(index);
+    if (part.wasQuoted)
     {
-      ++index;
+      result.append(QString(part.part));
     }
-
-    // a string with cutted command and spaces after it
-    QString midLine = line.mid(index);
-
-    QList<int> quoteIndexes;
-    for (index = midLine.indexOf('\"'); index != -1; index = midLine.indexOf('\"', index+1))
+    else
     {
-      quoteIndexes.append(index);
-    }
+      QString str(part.part);
 
-    // each quote should correspond it's pair
-    if (!(quoteIndexes.size() % 2))
-    {
-      // key: start index
-      QMap<int, StringPart> parts;
-
-      bool syntaxOk = true;
-
-      // insert quoted into line parts
-      for(int i=0; i< quoteIndexes.size()-1; i+=2)
+      // check that if next was quoted then current must ends with comma
+      if ((preResult.size() > index + 1) &&
+          (preResult.at(index + 1).wasQuoted))
       {
-        int openIndex = quoteIndexes.at(i);
-        int closeIndex = quoteIndexes.at(i+1);
-
-        // check for edge of ','
-        if (openIndex && (midLine.at(openIndex-1) != ','))
+        if (str.at(str.length() - 1) != ',')
         {
-          syntaxOk = false;
-          break;
+          return QStringList();
         }
-
-        if ((closeIndex < midLine.size() - 1) && (midLine.at(closeIndex+1) != ','))
-        {
-          syntaxOk = false;
-          break;
-        }
-
-        StringPart part;
-        part.quoted = true;
-        part.start = openIndex ? openIndex - 1 : openIndex;
-        part.size = closeIndex - part.start + 1;
-        part.string = midLine.mid(openIndex+1, closeIndex-openIndex-1);
-
-        parts.insert(part.start, part);
-      }
-
-      if (syntaxOk)
-      {
-        // key: start index
-        QMap<int, StringPart> partsNotQuoted;
-
-        // insert non-quoted into line parts
-        QMap<int, StringPart>::const_iterator iter = parts.constBegin();
-        QMap<int, StringPart>::const_iterator iterEnd = parts.constEnd();
-        int previousEnd = -1;
-        while (iter != iterEnd)
-        {
-          int quotedIndex = iter.key();
-          const StringPart& quotedPart = iter.value();
-
-          if (quotedIndex > previousEnd + 1)
-          {
-            StringPart part;
-            part.quoted = false;
-            part.start = previousEnd + 1;
-            part.size = quotedIndex - previousEnd - 1;
-            part.string = midLine.mid(part.start ? part.start + 1 : part.start,
-                                      quotedIndex - part.start - 1);
-
-            partsNotQuoted.insert(part.start, part);
-          }
-
-          previousEnd = quotedIndex + quotedPart.size - 1;
-
-          ++iter;
-        }
-
-        // insert non-quoted rest
-        if (parts.size() > 0)
-        {
-          const StringPart& last = parts.last();
-          if (last.start + last.size < midLine.size())
-          {
-            StringPart part;
-            part.quoted = false;
-            part.start = last.start + last.size;
-            part.size = midLine.size() - part.start;
-            part.string = midLine.mid(part.start + 1, part.size - 1);
-
-            partsNotQuoted.insert(part.start, part);
-          }
-        }
-        // if no quoted parts exist then insert a midline itself
         else
         {
-          StringPart part;
-          part.quoted = false;
-          part.start = 0;
-          part.size = midLine.size();
-          part.string = midLine;
-
-          partsNotQuoted.insert(part.start, part);
+          // remove last comma
+          str.resize(str.size() - 1);
         }
+      }
 
-        // unite
-        parts.unite(partsNotQuoted);
-
-        // construct result string list
-        foreach(const StringPart & part, parts)
-        {
-          if (part.quoted)
-          {
-            result.append(part.string);
-          }
-          else
-          {
-            result.append(part.string.split(',', QString::KeepEmptyParts));
-          }
-        }
+      foreach(const QByteArray &array, splitByteArray(str.toUtf8(), ",", KeepEmptyParts))
+      {
+        result.append(QString(array));
       }
     }
   }

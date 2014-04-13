@@ -56,9 +56,9 @@ QString hexString(const QList<QByteArray> & listData);
  *
  * Assume that 'X' is a separator. Then:
  *
- * KeepDataOnly:   (abcXXXabcXabcXXabc) ==> (abc)(abc)(abc)(abc)
- * KeepEmptyParts: (abcXXXabcXabcXXabc) ==> (abc)()()(abc)(abc)()(abc)
- * KeepSeparators: (abcXXXabcXabcXXabc) ==> (abc)(X)(X)(X)(abc)(X)(abc)(X)(X)(abc)
+ * KeepDataOnly:   (XXabcXXXabcXabcXXabcXX) ==>        (abc)         (abc)   (abc)      (abc)
+ * KeepEmptyParts: (XXabcXXXabcXabcXXabcXX) ==> () ()  (abc)  () ()  (abc)   (abc)  ()  (abc)  ()
+ * KeepSeparators: (XXabcXXXabcXabcXXabcXX) ==>  (X)(X)(abc)(X)(X)(X)(abc)(X)(abc)(X)(X)(abc)(X)(X)
  *
  */
 

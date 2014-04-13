@@ -11,13 +11,13 @@ QList<QByteArray> splitByteArray(const QByteArray &array,
   int arraySize = array.size();
   int sepSize = sep.size();
 
-  if ((sepSize >= arraySize) || (!arraySize) || (!sepSize))
-  {
-    return QList<QByteArray>() << array;
-  }
-  else if (array == sep)
+  if (!arraySize)
   {
     return QList<QByteArray>();
+  }
+  else if (!sepSize)
+  {
+    return QList<QByteArray>() << array;
   }
 
   QList<QByteArray> splitted;
@@ -29,6 +29,7 @@ QList<QByteArray> splitByteArray(const QByteArray &array,
   const char * c = arrayData;
   const char * k = c;
 
+  /* current_pos + sep_size <= array_size */
   while(c + sepSize <= arrayData + arraySize)
   {
     if (!memcmp(c, sepData, sepSize))
@@ -59,18 +60,21 @@ QList<QByteArray> splitByteArray(const QByteArray &array,
 
   // tail
   int rest = arraySize - (c - arrayData);
-  if (rest > 0)
+  Q_ASSERT(rest >= 0);
+
+  // there was a split just before exited cycle
+  if (k == c)
   {
-    // there was a split just before exited cycle
-    if (k == c)
+    if ((rest > 0) || (mode == KeepEmptyParts))
     {
       splitted.append(QByteArray(c, rest));
     }
-    else
-    {
-      Q_ASSERT(splitted.size() > 0);
-      splitted.last().append(c, rest);
-    }
+  }
+  // add rest (without splitting)
+  else if (rest > 0)
+  {
+    Q_ASSERT(splitted.size() > 0);
+    splitted.last().append(c, rest);
   }
 
   return splitted;
