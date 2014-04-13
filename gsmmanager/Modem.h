@@ -118,6 +118,9 @@ private:
 // an ID for QEvent object constructing
 extern QEvent::Type ModemEventType;
 
+class InitConversationHandler;
+class QTimer;
+
 class Modem : public PortController
 {
   Q_OBJECT
@@ -139,6 +142,10 @@ protected:
   bool processConversation(const Conversation & c);
   bool processUnexpectedData(const QByteArray& data);
   QByteArray requestData() const;
+  void modemDetected(bool status);
+
+protected slots:
+  void onInitTimeout();
 
 private:
   QLinkedList<ModemRequest*> m_requests;
@@ -146,6 +153,13 @@ private:
   // key is baseRequestOffset
   QMap<int, ConversationHandler*> m_conversationHandlers;
   QList<UnexpectedDataHandler*> m_unexpectedDataHandlers;
+
+  // is modem initialization sequence finished
+  bool m_modemInited;
+  // handlers that processes modem initialization
+  InitConversationHandler * m_initHandler;
+  // init timeout timer
+  QTimer * m_initTimer;
 
 };
 

@@ -184,7 +184,12 @@ void PortController::closePort()
   m_portControllerStatus = PORT_CONTROLLER_STATUS_READY;
   m_modemDetected = false;
 
-  emit updatedPortStatus(false);
+  modemDetected(false);
+}
+
+void PortController::modemDetected(bool status)
+{
+  emit updatedPortStatus(status);
 }
 
 void PortController::onReadyRead()
@@ -380,7 +385,7 @@ bool PortController::parseBuffer()
           m_portControllerStatus = PORT_CONTROLLER_STATUS_READY;
 
           m_modemDetected = true;
-          emit updatedPortStatus(true);
+          modemDetected(true);
         }
       }
       else if (m_modemDetected)

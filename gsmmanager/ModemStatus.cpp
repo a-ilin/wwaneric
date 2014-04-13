@@ -9,8 +9,8 @@
 bool StatusConversationHandler::processConversation(ModemRequest *request, const Conversation &c, bool &requestFinished)
 {
   const int &requestType = request->requestType;
-  //const RequestArgs &requestArgs = request.requestArgs;
-  //int &requestStage = request.requestStage;
+  //const RequestArgs &requestArgs = request->requestArgs;
+  //int &requestStage = request->requestStage;
 
   bool success = false;
 

@@ -2,6 +2,10 @@
 
 #include "common.h"
 
+#include "ModemInit.h"
+
+#include <QTimer>
+
 QEvent::Type ModemEventType = (QEvent::Type)QEvent::registerEventType();
 
 
@@ -153,13 +157,23 @@ QStringList parseAnswerLine(const QString &line, const QString &command)
 }
 
 Modem::Modem() :
-  PortController()
+  PortController(),
+  m_modemInited(false)
 {
+  m_initHandler = new InitConversationHandler();
+  registerConversationHandler(m_initHandler);
 
+  m_initTimer = new QTimer(this);
+  m_initTimer->setInterval(2000);
+  m_initTimer->setSingleShot(true);
+  connect(m_initTimer, SIGNAL(timeout()), SLOT(onInitTimeout()));
 }
 
 Modem::~Modem()
 {
+  unregisterConversationHandler(m_initHandler);
+  delete m_initHandler;
+
   if (m_conversationHandlers.size() > 0)
   {
     Q_LOGEX(LOG_VERBOSE_CRITICAL, "There is a conversation handler still registered!");
@@ -277,12 +291,35 @@ bool Modem::processConversation(const Conversation &c)
 
     if (handler)
     {
+      if ((handler != m_initHandler) && (!m_modemInited))
+      {
+        Q_LOGEX(LOG_VERBOSE_CRITICAL, "Modem is not initialized when answer received!");
+      }
+      else if (m_modemInited && (handler == m_initHandler))
+      {
+        Q_LOGEX(LOG_VERBOSE_CRITICAL, "Modem is already initialized when initizlization answer received!");
+      }
+
       success = handler->processConversation(request, c, requestProcessed);
 
-      if (c.status == Conversation::OK)
+      if (success && requestProcessed && (handler == m_initHandler))
       {
-        if (!success)
+        m_initTimer->stop();
+        m_modemInited = true;
+        modemDetected(true);
+      }
+
+      if(!success)
+      {
+        if (handler == m_initHandler)
         {
+          Q_LOGEX(LOG_VERBOSE_ERROR, "Error occured on modem initialization!");
+          modemDetected(false);
+        }
+
+        if (c.status == Conversation::OK)
+        {
+
           QString str = QString("Unprocessed answer received. " ENDL
                                 "Request:"      ENDL
                                 "%1."           ENDL
@@ -295,10 +332,7 @@ bool Modem::processConversation(const Conversation &c)
                         .arg(QString(c.statusData));
           Q_LOGEX(LOG_VERBOSE_ERROR, str);
         }
-      }
 
-      if (!success)
-      {
         --request->retryCount;
         Q_ASSERT(request->retryCount >= 0);
 
@@ -310,6 +344,7 @@ bool Modem::processConversation(const Conversation &c)
           Q_LOGEX(LOG_VERBOSE_NOTIFICATION, "Request retry count is ended. Request removed from queue.");
         }
       }
+
     }
     else
     {
@@ -387,5 +422,27 @@ QByteArray Modem::requestData() const
   }
 
   return data;
+}
+
+void Modem::modemDetected(bool status)
+{
+  if (m_modemInited || (!status))
+  {
+    m_modemInited = status;
+    PortController::modemDetected(status);
+  }
+  else
+  {
+    m_initHandler->initModem();
+    m_initTimer->start();
+  }
+}
+
+void Modem::onInitTimeout()
+{
+  if (!m_modemInited)
+  {
+    closePort();
+  }
 }
 

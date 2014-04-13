@@ -87,7 +87,10 @@ QString hexString(const QByteArray& data)
   QString str;
   for(int i=0; i< data.size(); ++i)
   {
-    str += QString::number(data.constData()[i], 16) + QChar(' ');
+    uchar byte = data.constData()[i];
+    QString hex = QString::number(byte, 16).left(2).toUpper();
+    hex = hex.size() > 1 ? hex : QChar('0') + hex;
+    str += hex + QChar(' ');
   }
   return str;
 }

@@ -48,7 +48,8 @@ SOURCES += \
     ModemSms.cpp \
     ModemStatus.cpp \
     ModemUssd.cpp \
-    AppSettingsDialog.cpp
+    AppSettingsDialog.cpp \
+    ModemInit.cpp
 
 HEADERS  += \
     common.h \
@@ -69,7 +70,8 @@ HEADERS  += \
     ModemSms.h \
     ModemStatus.h \
     ModemUssd.h \
-    AppSettingsDialog.h
+    AppSettingsDialog.h \
+    ModemInit.h
 
 FORMS    += \
     MainWindow.ui \

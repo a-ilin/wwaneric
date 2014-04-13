@@ -289,6 +289,8 @@ void UssdView::onSendUssdClicked()
     QToolTip::showText(pos, tr("USSD should not be empty!"),
                        ui->lineEdit);
   }
+
+  ui->lineEdit->clear();
 }
 
 UssdValidator::UssdValidator(QObject *parent) :

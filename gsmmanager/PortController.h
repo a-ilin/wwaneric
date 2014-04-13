@@ -91,6 +91,8 @@ protected:
   virtual bool processUnexpectedData(const QByteArray& data) = 0;
   // return raw data for request from queue
   virtual QByteArray requestData() const = 0;
+  // called when modem detection status changed
+  virtual void modemDetected(bool status);
 
 protected slots:
   // retrieves next request and sends it to port sendToPort
