@@ -31,17 +31,17 @@ public:
   void init();
   void tini();
 
-  void restore(Settings &set);
-  void store(Settings &set);
-
   QSystemTrayIcon* trayIcon() const { return m_trayIcon; }
 
 protected:
   void changeEvent(QEvent *e);
   void closeEvent(QCloseEvent *event);
 
-  QList<IView *> createViews();
-  void removeViews(QTabWidget* container);
+  QList<IView *> createViews(const QString& groupName);
+  void removeViews(QTabWidget* container, const QString &groupName);
+
+  void restore();
+  void store();
 
 protected slots:
   void containerDestroyed(QObject * obj);
@@ -59,7 +59,17 @@ protected slots:
 protected:
   Ui::MainWindow *ui;
 
-  typedef QHash<QString, QTabWidget*> ContainerHash;
+  struct Box
+  {
+    Box() :
+      container(NULL),
+      menuGroup(NULL) {}
+
+    QTabWidget * container;
+    QMenu * menuGroup;
+  };
+
+  typedef QHash<QString, Box> ContainerHash;
   ContainerHash m_boxes;
 
   typedef QMultiMap<QTabWidget*, IView*> MapViews;

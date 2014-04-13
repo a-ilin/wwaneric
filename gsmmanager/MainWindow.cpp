@@ -14,9 +14,12 @@
 
 #include <QCloseEvent>
 #include <QDesktopServices>
+#include <QInputDialog>
 #include <QMdiSubWindow>
 #include <QMessageBox>
 #include <QUrl>
+
+#define SET_GROUP_PREFIX "grp_"
 
 MainWindow::MainWindow(QWidget *parent) :
   QMainWindow(parent),
@@ -56,12 +59,6 @@ MainWindow::MainWindow(QWidget *parent) :
 
 MainWindow::~MainWindow()
 {
-  QList<QString> groups = m_boxes.keys();
-  foreach(const QString &group, groups)
-  {
-    removeViewGroup(group);
-  }
-
   delete ui;
 }
 
@@ -92,7 +89,7 @@ void MainWindow::closeEvent(QCloseEvent* event)
   }
 }
 
-QList<IView *> MainWindow::createViews()
+QList<IView *> MainWindow::createViews(const QString &groupName)
 {
   QList<IView *> views;
   views.append(new ModemStatusView(this));
@@ -102,18 +99,22 @@ QList<IView *> MainWindow::createViews()
 
   Settings set;
 
+  set.beginGroup(QString(SET_GROUP_PREFIX) + groupName);
+
   foreach(IView* view, views)
   {
     view->init();
     view->restore(set);
   }
 
+  set.endGroup();
+
   return views;
 }
 
 void MainWindow::addViewGroup(const QString &groupName)
 {
-  QTabWidget * container = m_boxes.value(groupName);
+  QTabWidget * container = m_boxes.value(groupName).container;
 
   // create new one
   if(!container)
@@ -124,27 +125,37 @@ void MainWindow::addViewGroup(const QString &groupName)
     container->setTabsClosable(false);
     container->setMovable(false);
 
-    m_boxes.insert(groupName, container);
-
     QMdiSubWindow* subWindow =  ui->mdiArea->addSubWindow(container);
     subWindow->setWindowTitle(groupName);
     subWindow->showMaximized();
 
-    QList<IView *> views = createViews();
+    Box box;
+    box.container = container;
+    box.menuGroup = new QMenu(groupName, this);
+    ui->menuConnections->addMenu(box.menuGroup);
 
+    QList<IView *> views = createViews(groupName);
     foreach(IView* view, views)
     {
       m_views.insertMulti(container, view);
       container->addTab(view->widget(), view->name());
+      box.menuGroup->addAction(view->name());
     }
+
+    box.menuGroup->addSeparator();
+    box.menuGroup->addAction(tr("Remove connection"));
+
+    m_boxes.insert(groupName, box);
   }
 }
 
-void MainWindow::removeViews(QTabWidget *container)
+void MainWindow::removeViews(QTabWidget *container, const QString& groupName)
 {
   Q_ASSERT(container);
 
   Settings set;
+  set.beginGroup(QString(SET_GROUP_PREFIX) + groupName);
+
   QList<IView *> views = m_views.values(container);
   foreach(IView* view, views)
   {
@@ -153,19 +164,48 @@ void MainWindow::removeViews(QTabWidget *container)
     delete view;
   }
 
+  set.endGroup();
+
   m_views.remove(container);
+}
+
+void MainWindow::restore()
+{
+  Settings set;
+  set.beginGroup(SET_MAINWINDOW_GROUP);
+  m_minimizeOnClose = set.value(SET_MAINWINDOW_MINIMIZE_ON_CLOSE).toInt();
+  m_exit = !m_minimizeOnClose;
+  QStringList groups = set.value("groups").toStringList();
+  set.endGroup();
+
+  foreach (const QString &grp, groups)
+  {
+    addViewGroup(grp);
+  }
+}
+
+void MainWindow::store()
+{
+  Settings set;
+
+  set.beginGroup(SET_MAINWINDOW_GROUP);
+  set.setValue(SET_MAINWINDOW_MINIMIZE_ON_CLOSE, m_minimizeOnClose ? 1 : 0);
+
+  QStringList groups = m_boxes.keys();
+  set.setValue("groups", groups);
+  set.endGroup();
 }
 
 void MainWindow::removeViewGroup(const QString &groupName)
 {
-  QTabWidget * container = m_boxes.value(groupName);
+  QTabWidget * container = m_boxes.value(groupName).container;
 
   if (container)
   {
     m_boxes.remove(groupName);
     ui->mdiArea->removeSubWindow(container);
 
-    removeViews(container);
+    removeViews(container, groupName);
 
     delete container;
   }
@@ -176,26 +216,19 @@ void MainWindow::init()
   Modem * modem = Core::instance()->modem();
   connect(modem, SIGNAL(updatedPortStatus(bool)),
           this, SLOT(updatePortStatus(bool)));
+
+  restore();
 }
 
 void MainWindow::tini()
 {
+  store();
 
-}
-
-void MainWindow::restore(Settings& set)
-{
-  set.beginGroup(SET_MAINWINDOW_GROUP);
-  m_minimizeOnClose = set.value(SET_MAINWINDOW_MINIMIZE_ON_CLOSE).toInt();
-  m_exit = !m_minimizeOnClose;
-  set.endGroup();
-}
-
-void MainWindow::store(Settings& set)
-{
-  set.beginGroup(SET_MAINWINDOW_GROUP);
-  set.setValue(SET_MAINWINDOW_MINIMIZE_ON_CLOSE, m_minimizeOnClose ? 1 : 0);
-  set.endGroup();
+  QStringList groups = m_boxes.keys();
+  foreach(const QString &group, groups)
+  {
+    removeViewGroup(group);
+  }
 }
 
 void MainWindow::containerDestroyed(QObject *obj)
@@ -205,16 +238,23 @@ void MainWindow::containerDestroyed(QObject *obj)
   ContainerHash::iterator iter = m_boxes.begin();
   ContainerHash::const_iterator iterEnd = m_boxes.constEnd();
 
+  QString groupName;
+
   while(iter != iterEnd)
   {
-    if(iter.value() == container)
+    if(iter.value().container == container)
     {
-      m_boxes.erase(iter);
+      groupName = iter.key();
+      iter = m_boxes.erase(iter);
       break;
+    }
+    else
+    {
+      ++iter;
     }
   }
 
-  removeViews(container);
+  removeViews(container, groupName);
 }
 
 void MainWindow::updateActionTriggered()
@@ -245,15 +285,33 @@ void MainWindow::updatePortStatus(bool opened)
 
 void MainWindow::addConnection()
 {
+  bool ok = false;
+  QString name = QInputDialog::getText(this, tr("Specify connection name"),
+                                       tr("Name: "), QLineEdit::Normal, QString(), &ok);
 
+  if (ok)
+  {
+    if (!name.isEmpty())
+    {
+      addViewGroup(name);
+    }
+    else
+    {
+      QMessageBox::critical(this, tr("Wrong value"), tr("Name cannot be empty!"));
+    }
+  }
 }
 
 void MainWindow::showPreferences()
 {
+  Core::instance()->storeSettings();
+  store();
+
   AppSettingsDialog d(this);
   if (d.exec())
   {
     Core::instance()->restoreSettings();
+    restore();
   }
 }
 
@@ -281,7 +339,6 @@ void MainWindow::trayIconActivated(QSystemTrayIcon::ActivationReason reason)
   }
 }
 
-#include <QTimer>
 void MainWindow::onShowAction()
 {
   if (isHidden())

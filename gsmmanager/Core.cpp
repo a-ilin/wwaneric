@@ -92,11 +92,8 @@ bool Core::init()
     }
 
     // MainWindow
-    Settings set;
     m_mainWindow = new MainWindow(NULL);
     m_mainWindow->init();
-    m_mainWindow->restore(set);
-    m_mainWindow->addViewGroup(QString("Default"));
     m_mainWindow->show();
   }
   catch(...)
@@ -114,8 +111,6 @@ bool Core::tini()
     // MainWindow
     if (m_mainWindow)
     {
-      Settings set;
-      m_mainWindow->store(set);
       m_mainWindow->tini();
       delete m_mainWindow;
       m_mainWindow = NULL;
@@ -207,12 +202,12 @@ ConversationHandler* Core::conversationHandler(Modem *modem, const QString &name
   return handler;
 }
 
+void Core::storeSettings()
+{
+
+}
+
 void Core::restoreSettings()
 {
-  Settings set;
 
-  if (m_mainWindow)
-  {
-    m_mainWindow->restore(set);
-  }
 }

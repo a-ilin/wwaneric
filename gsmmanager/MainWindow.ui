@@ -77,7 +77,6 @@
     <property name="title">
      <string>Edit</string>
     </property>
-    <addaction name="actionAdd_connection"/>
     <addaction name="separator"/>
     <addaction name="actionPreferences"/>
    </widget>
@@ -89,8 +88,16 @@
     <addaction name="actionAbout"/>
     <addaction name="actionAbout_Qt"/>
    </widget>
+   <widget class="QMenu" name="menuConnections">
+    <property name="title">
+     <string>Connections</string>
+    </property>
+    <addaction name="actionAdd_connection"/>
+    <addaction name="separator"/>
+   </widget>
    <addaction name="menuFile"/>
    <addaction name="menuEdit"/>
+   <addaction name="menuConnections"/>
    <addaction name="menuHelp"/>
   </widget>
   <widget class="QStatusBar" name="statusBar"/>
@@ -153,6 +160,14 @@
   <action name="actionAdd_connection">
    <property name="text">
     <string>Add connection</string>
+   </property>
+  </action>
+  <action name="actionRemove_connection">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Remove connection</string>
    </property>
   </action>
  </widget>

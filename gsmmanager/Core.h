@@ -29,6 +29,7 @@ public:
 
   MainWindow * mainWindow() const { return m_mainWindow; }
 
+  void storeSettings();
   void restoreSettings();
 
 private:
