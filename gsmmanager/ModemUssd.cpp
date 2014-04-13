@@ -25,9 +25,17 @@ bool UssdConversationHandler::processConversation(ModemRequest *request, const C
           success = true;
         }
       }
+      // it can be just a confirmation of our termination request processing
       else
       {
-        Q_LOGEX(LOG_VERBOSE_ERROR, "Answer data is empty!");
+        QString answer;
+        USSD_STATUS status;
+        if (processUssdData(c.request, answer, status))
+        {
+          emit updatedUssd(answer, status);
+          requestFinished = true;
+          success = true;
+        }
       }
 
       if (!success)
@@ -104,6 +112,13 @@ bool UssdConversationHandler::processUssdData(const QString& data, QString& msg,
 {
   bool result = false;
   QStringList headerLine = parseAnswerLine(data, "+CUSD:");
+
+  // try checking our request
+  if (!headerLine.size())
+  {
+    headerLine = parseAnswerLine(data, "AT+CUSD=");
+  }
+
   if (headerLine.size() > 1)
   {
     bool decoded = true;

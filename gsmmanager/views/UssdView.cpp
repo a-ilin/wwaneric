@@ -36,6 +36,8 @@ UssdView::UssdView(QWidget *parent) :
 
   connect(ui->sendUssdButton, SIGNAL(clicked()), this, SLOT(onSendUssdClicked()));
   connect(ui->lineEdit, SIGNAL(returnPressed()), this, SLOT(onSendUssdClicked()));
+
+  connect(ui->pushButtonTerminate, SIGNAL(clicked()), SLOT(terminateSession()));
 }
 
 UssdView::~UssdView()
@@ -92,8 +94,10 @@ QString UssdView::name()
 
 void UssdView::sendUssd(const QString &ussd)
 {
-  const QString htmlSent("<html><head/><body><p><span style=\" color:blue;\"> %1 </span></p></body></html>");
-  ui->ussdAnswer->appendHtml(htmlSent.arg(tr("Sent:<br>%1").arg(ussd)));
+  ui->ussdAnswer->appendHtml(QString("<html><head/><body><p><span style=\" "
+                                     "color:blue;\"> %1 </span></p></body></html>")
+                             .arg(tr("Sent:")));
+  ui->ussdAnswer->appendPlainText(ussd);
 
   Modem * modem = Core::instance()->modem();
   UssdConversationHandler * ussdHandler =
@@ -105,8 +109,13 @@ void UssdView::sendUssd(const QString &ussd)
 
 void UssdView::receivedUssd(const QString &ussdAnswer, USSD_STATUS status)
 {
-  const QString htmlReceived("<html><head/><body><p><span style=\" color:red;\"> %1 </span></p></body></html>");
-  ui->ussdAnswer->appendHtml(htmlReceived.arg(tr("Received:<br>%1").arg(ussdAnswer)));
+  if (!ussdAnswer.isEmpty())
+  {
+    ui->ussdAnswer->appendHtml(QString("<html><head/><body><p><span style=\" "
+                                       "color:red;\"> %1 </span></p></body></html>")
+                               .arg(tr("Received:")));
+    ui->ussdAnswer->appendPlainText(ussdAnswer);
+  }
 
   receivedStatus(status);
 }
@@ -119,27 +128,44 @@ void UssdView::receivedStatus(USSD_STATUS status)
   {
   case USSD_STATUS_FINISHED:
     statusStr = tr("USSD session: finished.");
+    ui->pushButtonTerminate->setEnabled(false);
     break;
   case USSD_STATUS_USER_ACTION_NEEDED:
     statusStr = tr("USSD session: active.");
+    ui->pushButtonTerminate->setEnabled(true);
     break;
   case USSD_STATUS_DIALOGUE_TERMINATED:
     statusStr = tr("USSD session: terminated.");
+    ui->pushButtonTerminate->setEnabled(false);
     break;
   case USSD_STATUS_OTHER_IO_RESPONDED:
     statusStr = tr("USSD session: other client responded.");
+    ui->pushButtonTerminate->setEnabled(false);
     break;
   case USSD_STATUS_OPERATION_NOT_SUPPORTED:
     statusStr = tr("USSD session: operation not supported.");
+    ui->pushButtonTerminate->setEnabled(false);
     break;
   case USSD_STATUS_NETWORK_TIMEOUT:
     statusStr = tr("USSD session: network time out.");
+    ui->pushButtonTerminate->setEnabled(false);
     break;
   default:
     statusStr = tr("USSD session: unknown.");
+    ui->pushButtonTerminate->setEnabled(true);
   }
 
   ui->labelSessionStatus->setText(statusStr);
+}
+
+void UssdView::terminateSession()
+{
+  Modem * modem = Core::instance()->modem();
+  UssdConversationHandler * ussdHandler =
+      static_cast<UssdConversationHandler*> (Core::instance()->conversationHandler(modem, USSD_HANDLER_NAME));
+
+  receivedStatus(USSD_STATUS_DIALOGUE_TERMINATED);
+  ussdHandler->sendUssd("", USSD_SEND_STATUS_DIALOGUE_TERMINATE);
 }
 
 void UssdView::updateUssd(const QList<Ussd> &ussdList)
