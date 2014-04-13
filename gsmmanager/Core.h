@@ -29,6 +29,8 @@ public:
 
   MainWindow * mainWindow() const { return m_mainWindow; }
 
+  void restoreSettings();
+
 private:
 
   static Core * m_instance;

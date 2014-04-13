@@ -47,7 +47,8 @@ SOURCES += \
     PortController.cpp \
     ModemSms.cpp \
     ModemStatus.cpp \
-    ModemUssd.cpp
+    ModemUssd.cpp \
+    AppSettingsDialog.cpp
 
 HEADERS  += \
     common.h \
@@ -67,14 +68,16 @@ HEADERS  += \
     PortController.h \
     ModemSms.h \
     ModemStatus.h \
-    ModemUssd.h
+    ModemUssd.h \
+    AppSettingsDialog.h
 
 FORMS    += \
     MainWindow.ui \
     views/SmsView.ui \
     views/SettingsView.ui \
     views/ModemStatusView.ui \
-    views/UssdView.ui
+    views/UssdView.ui \
+    AppSettingsDialog.ui
 
 RESOURCES += \
     icons.qrc

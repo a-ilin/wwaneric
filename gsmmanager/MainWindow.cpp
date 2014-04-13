@@ -10,15 +10,48 @@
 #include "views/UssdView.h"
 #include "views/SettingsView.h"
 
+#include "AppSettingsDialog.h"
 
+#include <QCloseEvent>
+#include <QDesktopServices>
 #include <QMdiSubWindow>
+#include <QMessageBox>
+#include <QUrl>
 
 MainWindow::MainWindow(QWidget *parent) :
   QMainWindow(parent),
-  ui(new Ui::MainWindow)
+  ui(new Ui::MainWindow),
+  m_exit(true),
+  m_minimizeOnClose(false)
 {
   ui->setupUi(this);
-  connect(ui->actionUpdate, SIGNAL(triggered()), this, SLOT(updateActionTriggered()));
+
+  // tray icon
+  QAction * showAction = new QAction(tr("Show"), this);
+  connect(showAction, SIGNAL(triggered()), SLOT(onShowAction()));
+
+  m_trayIcon = new QSystemTrayIcon(QApplication::windowIcon(), this);
+  m_trayIcon->show();
+  connect(m_trayIcon, SIGNAL(activated(QSystemTrayIcon::ActivationReason)),
+          SLOT(trayIconActivated(QSystemTrayIcon::ActivationReason)));
+
+  m_trayMenu = new QMenu(this);
+  m_trayMenu->addAction(showAction);
+  m_trayMenu->addSeparator();
+  m_trayMenu->addAction(ui->actionUpdate);
+  m_trayMenu->addAction(ui->actionExit);
+  m_trayMenu->setDefaultAction(showAction);
+
+  m_trayIcon->setContextMenu(m_trayMenu);
+
+  // main menu actions
+  connect(ui->actionUpdate, SIGNAL(triggered()), SLOT(updateActionTriggered()));
+  connect(ui->actionExit, SIGNAL(triggered()), SLOT(onExitAction()));
+  connect(ui->actionAdd_connection, SIGNAL(triggered()), SLOT(addConnection()));
+  connect(ui->actionPreferences, SIGNAL(triggered()), SLOT(showPreferences()));
+  connect(ui->actionVisit_website, SIGNAL(triggered()), SLOT(visitWebsite()));
+  connect(ui->actionAbout, SIGNAL(triggered()), SLOT(showAbout()));
+  connect(ui->actionAbout_Qt, SIGNAL(triggered()), SLOT(showAboutQt()));
 }
 
 MainWindow::~MainWindow()
@@ -42,6 +75,20 @@ void MainWindow::changeEvent(QEvent *e)
     break;
   default:
     break;
+  }
+}
+
+void MainWindow::closeEvent(QCloseEvent* event)
+{
+  if (!m_exit)
+  {
+    showMinimized();
+    hide();
+
+    m_trayIcon->showMessage(tr("wwanEric is still running here."),
+                            tr("Notifications will be showed when something important occures."));
+
+    event->ignore();
   }
 }
 
@@ -138,12 +185,17 @@ void MainWindow::tini()
 
 void MainWindow::restore(Settings& set)
 {
-
+  set.beginGroup(SET_MAINWINDOW_GROUP);
+  m_minimizeOnClose = set.value(SET_MAINWINDOW_MINIMIZE_ON_CLOSE).toInt();
+  m_exit = !m_minimizeOnClose;
+  set.endGroup();
 }
 
 void MainWindow::store(Settings& set)
 {
-
+  set.beginGroup(SET_MAINWINDOW_GROUP);
+  set.setValue(SET_MAINWINDOW_MINIMIZE_ON_CLOSE, m_minimizeOnClose ? 1 : 0);
+  set.endGroup();
 }
 
 void MainWindow::containerDestroyed(QObject *obj)
@@ -181,11 +233,72 @@ void MainWindow::updateActionTriggered()
   }
 }
 
-void MainWindow::updatedPortStatus(bool opened)
+void MainWindow::updatePortStatus(bool opened)
 {
+  ui->actionUpdate->setEnabled(opened);
+
   if (opened)
   {
     updateActionTriggered();
   }
+}
+
+void MainWindow::addConnection()
+{
+
+}
+
+void MainWindow::showPreferences()
+{
+  AppSettingsDialog d(this);
+  if (d.exec())
+  {
+    Core::instance()->restoreSettings();
+  }
+}
+
+void MainWindow::visitWebsite()
+{
+  QDesktopServices::openUrl(QUrl("http://yandex.ru"));
+}
+
+void MainWindow::showAbout()
+{
+  QString aboutStr = tr("Sample text");
+  QMessageBox::about(this, tr("About wwanEric"), aboutStr);
+}
+
+void MainWindow::showAboutQt()
+{
+  QMessageBox::aboutQt(this);
+}
+
+void MainWindow::trayIconActivated(QSystemTrayIcon::ActivationReason reason)
+{
+  if ((reason == QSystemTrayIcon::Trigger) || (reason == QSystemTrayIcon::DoubleClick))
+  {
+    onShowAction();
+  }
+}
+
+#include <QTimer>
+void MainWindow::onShowAction()
+{
+  if (isHidden())
+  {
+    show();
+    showNormal();
+    activateWindow();
+  }
+  else
+  {
+    activateWindow();
+  }
+}
+
+void MainWindow::onExitAction()
+{
+  m_exit = true;
+  close();
 }
 

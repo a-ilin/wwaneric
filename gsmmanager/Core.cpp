@@ -206,3 +206,13 @@ ConversationHandler* Core::conversationHandler(Modem *modem, const QString &name
 
   return handler;
 }
+
+void Core::restoreSettings()
+{
+  Settings set;
+
+  if (m_mainWindow)
+  {
+    m_mainWindow->restore(set);
+  }
+}

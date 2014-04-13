@@ -5,6 +5,7 @@
 
 #include <QMainWindow>
 #include <QMultiMap>
+#include <QSystemTrayIcon>
 
 namespace Ui
 {
@@ -13,6 +14,7 @@ namespace Ui
 
 class IView;
 
+class QSystemTrayIcon;
 class QTabWidget;
 
 class MainWindow : public QMainWindow
@@ -32,8 +34,11 @@ public:
   void restore(Settings &set);
   void store(Settings &set);
 
+  QSystemTrayIcon* trayIcon() const { return m_trayIcon; }
+
 protected:
   void changeEvent(QEvent *e);
+  void closeEvent(QCloseEvent *event);
 
   QList<IView *> createViews();
   void removeViews(QTabWidget* container);
@@ -41,7 +46,15 @@ protected:
 protected slots:
   void containerDestroyed(QObject * obj);
   void updateActionTriggered();
-  void updatedPortStatus(bool opened);
+  void updatePortStatus(bool opened);
+  void addConnection();
+  void showPreferences();
+  void visitWebsite();
+  void showAbout();
+  void showAboutQt();
+  void trayIconActivated(QSystemTrayIcon::ActivationReason reason);
+  void onShowAction();
+  void onExitAction();
 
 protected:
   Ui::MainWindow *ui;
@@ -51,6 +64,12 @@ protected:
 
   typedef QMultiMap<QTabWidget*, IView*> MapViews;
   MapViews m_views;
+
+  QSystemTrayIcon * m_trayIcon;
+  QMenu * m_trayMenu;
+
+  bool m_exit;
+  bool m_minimizeOnClose;
 
 };
 

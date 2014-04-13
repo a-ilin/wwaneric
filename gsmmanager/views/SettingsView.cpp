@@ -234,11 +234,6 @@ void SettingsView::updatePortStatus(bool opened)
   ui->cbComPort->setEnabled(!opened);
   ui->advancedSettings->setEnabled(!opened);
   ui->closeButton->setEnabled(opened);
-
-  if (opened)
-  {
-    Core::instance()->mainWindow()->updateActionTriggered();
-  }
 }
 
 void SettingsView::defaultCheckBoxStateChanged(int state)
