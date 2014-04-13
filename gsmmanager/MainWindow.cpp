@@ -14,10 +14,15 @@
 
 #include <QCloseEvent>
 #include <QDesktopServices>
+#include <QDockWidget>
 #include <QInputDialog>
 #include <QMdiSubWindow>
 #include <QMessageBox>
 #include <QUrl>
+
+#ifdef QT_DEBUG
+#include "debugParsers.h"
+#endif
 
 #define SET_GROUP_PREFIX "grp_"
 
@@ -55,6 +60,17 @@ MainWindow::MainWindow(QWidget *parent) :
   connect(ui->actionVisit_website, SIGNAL(triggered()), SLOT(visitWebsite()));
   connect(ui->actionAbout, SIGNAL(triggered()), SLOT(showAbout()));
   connect(ui->actionAbout_Qt, SIGNAL(triggered()), SLOT(showAboutQt()));
+
+  setTabPosition(Qt::AllDockWidgetAreas, QTabWidget::North);
+  setTabShape(QTabWidget::Triangular);
+  setDocumentMode(true);
+
+#ifdef QT_DEBUG
+  DebugParsers * dbgParsers = new DebugParsers(this);
+
+  QMenu * debugMenu = ui->menuBar->addMenu("Debug");
+  debugMenu->addAction("Debug parsers", dbgParsers, SLOT(show()));
+#endif
 }
 
 MainWindow::~MainWindow()
@@ -114,59 +130,73 @@ QList<IView *> MainWindow::createViews(const QString &groupName)
 
 void MainWindow::addViewGroup(const QString &groupName)
 {
-  QTabWidget * container = m_boxes.value(groupName).container;
-
   // create new one
-  if(!container)
+  if(!m_boxes.contains(groupName))
   {
-    container = new QTabWidget(this);
-    connect(container, SIGNAL(destroyed(QObject*)), this, SLOT(containerDestroyed(QObject*)));
-    container->setTabShape(QTabWidget::Triangular);
-    container->setTabsClosable(false);
-    container->setMovable(false);
+    // group menu
+    QMenu * menuGroup = new QMenu(groupName, this);
+    ui->menuConnections->addMenu(menuGroup);
+    menuGroup->setObjectName(groupName);
 
-    QMdiSubWindow* subWindow =  ui->mdiArea->addSubWindow(container);
-    subWindow->setWindowTitle(groupName);
-    subWindow->showMaximized();
+    QList<QDockWidget*> dockWidgets;
 
-    Box box;
-    box.container = container;
-    box.menuGroup = new QMenu(groupName, this);
-    ui->menuConnections->addMenu(box.menuGroup);
-
+    // views
     QList<IView *> views = createViews(groupName);
     foreach(IView* view, views)
     {
-      m_views.insertMulti(container, view);
-      container->addTab(view->widget(), view->name());
-      box.menuGroup->addAction(view->name());
+      // dock widget create
+      QString name = QString("%1 - %2").arg(groupName).arg(view->name());
+      QDockWidget * dockWidget = new QDockWidget(name, this);
+      dockWidget->setWidget(view->widget());
+      dockWidget->setFeatures(dockWidget->features() & ~QDockWidget::DockWidgetClosable);
+      addDockWidget(Qt::RightDockWidgetArea, dockWidget);
+      dockWidgets.append(dockWidget);
+
+      // toggle action
+      QAction * toggleAction = menuGroup->addAction(view->name());
+      toggleAction->setCheckable(true);
+      toggleAction->setChecked(true);
+      connect(toggleAction, SIGNAL(toggled(bool)), dockWidget, SLOT(setVisible(bool)));
+
+      // index
+      Box box;
+      box.view = view;
+      box.container = dockWidget;
+      m_boxes.insertMulti(groupName, box);
     }
 
-    box.menuGroup->addSeparator();
-    box.menuGroup->addAction(tr("Remove connection"));
+    // tabify created dock widgets
+    for (int i=0; i<dockWidgets.size()-1 ; ++i)
+    {
+      tabifyDockWidget(dockWidgets.at(i), dockWidgets.at(i+1));
+    }
+    if (dockWidgets.size())
+    {
+      dockWidgets.at(0)->raise();
+    }
 
-    m_boxes.insert(groupName, box);
+    // group menu
+    menuGroup->addSeparator();
+    QAction * removeAction = menuGroup->addAction(tr("Remove connection"));
+    removeAction->setData(groupName);
+    connect(removeAction, SIGNAL(triggered()), SLOT(onRemoveGroupAction()));
   }
 }
 
-void MainWindow::removeViews(QTabWidget *container, const QString& groupName)
+void MainWindow::removeViews(const QList<Box> & boxes, const QString& groupName)
 {
-  Q_ASSERT(container);
-
   Settings set;
   set.beginGroup(QString(SET_GROUP_PREFIX) + groupName);
 
-  QList<IView *> views = m_views.values(container);
-  foreach(IView* view, views)
+  foreach(const Box &box, boxes)
   {
+    IView * view = box.view;
     view->store(set);
     view->tini();
     delete view;
   }
 
   set.endGroup();
-
-  m_views.remove(container);
 }
 
 void MainWindow::restore()
@@ -191,23 +221,40 @@ void MainWindow::store()
   set.beginGroup(SET_MAINWINDOW_GROUP);
   set.setValue(SET_MAINWINDOW_MINIMIZE_ON_CLOSE, m_minimizeOnClose ? 1 : 0);
 
-  QStringList groups = m_boxes.keys();
+  QStringList groups = m_boxes.uniqueKeys();
   set.setValue("groups", groups);
   set.endGroup();
 }
 
 void MainWindow::removeViewGroup(const QString &groupName)
 {
-  QTabWidget * container = m_boxes.value(groupName).container;
+  QList<Box> boxes = m_boxes.values(groupName);
 
-  if (container)
+  if (boxes.size())
   {
     m_boxes.remove(groupName);
-    ui->mdiArea->removeSubWindow(container);
 
-    removeViews(container, groupName);
+    // remove dock widgets from MainWindow
+    foreach(const Box &box, boxes)
+    {
+      removeDockWidget(box.container);
+    }
 
-    delete container;
+    // delete views
+    removeViews(boxes, groupName);
+
+    foreach(const Box &box, boxes)
+    {
+      // delete dock widgets
+      removeDockWidget(box.container);
+    }
+
+    // menu
+    QMenu * menu = findChild<QMenu*>(groupName);
+    Q_ASSERT(menu);
+    menu->clear();
+    ui->menuConnections->removeAction(menu->menuAction());
+    menu->deleteLater();
   }
 }
 
@@ -224,47 +271,21 @@ void MainWindow::tini()
 {
   store();
 
-  QStringList groups = m_boxes.keys();
+  QStringList groups = m_boxes.uniqueKeys();
   foreach(const QString &group, groups)
   {
     removeViewGroup(group);
   }
 }
 
-void MainWindow::containerDestroyed(QObject *obj)
-{
-  QTabWidget * container = static_cast<QTabWidget*>(obj);
-
-  ContainerHash::iterator iter = m_boxes.begin();
-  ContainerHash::const_iterator iterEnd = m_boxes.constEnd();
-
-  QString groupName;
-
-  while(iter != iterEnd)
-  {
-    if(iter.value().container == container)
-    {
-      groupName = iter.key();
-      iter = m_boxes.erase(iter);
-      break;
-    }
-    else
-    {
-      ++iter;
-    }
-  }
-
-  removeViews(container, groupName);
-}
-
 void MainWindow::updateActionTriggered()
 {
-  MapViews::const_iterator iter = m_views.constBegin();
-  MapViews::const_iterator iterEnd = m_views.constEnd();
+  ContainerHash::const_iterator iter = m_boxes.constBegin();
+  ContainerHash::const_iterator iterEnd = m_boxes.constEnd();
 
   while(iter != iterEnd)
   {
-    IView * view = iter.value();
+    IView * view = iter.value().view;
     QEvent * event = new QEvent(ModemEventType);
 
     QCoreApplication::postEvent(view->widget(), event);
@@ -357,5 +378,28 @@ void MainWindow::onExitAction()
 {
   m_exit = true;
   close();
+}
+
+/**
+ * @brief MainWindow::onRemoveGroupAction
+ *
+ * This is called when user likes to _delete_ the connection, including it settings.
+ */
+void MainWindow::onRemoveGroupAction()
+{
+  QAction * action = qobject_cast<QAction*>(sender());
+  Q_ASSERT(action);
+  QString groupName = action->data().toString();
+
+  if (QMessageBox::question(this, tr("Remove connection?"),
+                        tr("Are you really like to remove connection \"%1\"?" ENDL
+                           "All locally stored settings and info will be removed.")
+                            .arg(groupName),
+                        QMessageBox::Yes, QMessageBox::No) == QMessageBox::Yes)
+  {
+    removeViewGroup(groupName);
+    Settings set;
+    set.remove(QString(SET_GROUP_PREFIX) + groupName);
+  }
 }
 

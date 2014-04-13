@@ -6,63 +6,23 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>697</width>
-    <height>473</height>
+    <width>402</width>
+    <height>221</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>wwanEric</string>
   </property>
-  <widget class="QWidget" name="centralWidget">
-   <layout class="QHBoxLayout" name="horizontalLayout">
-    <property name="spacing">
-     <number>0</number>
-    </property>
-    <property name="leftMargin">
-     <number>0</number>
-    </property>
-    <property name="topMargin">
-     <number>0</number>
-    </property>
-    <property name="rightMargin">
-     <number>0</number>
-    </property>
-    <property name="bottomMargin">
-     <number>0</number>
-    </property>
-    <item>
-     <widget class="QMdiArea" name="mdiArea">
-      <property name="verticalScrollBarPolicy">
-       <enum>Qt::ScrollBarAsNeeded</enum>
-      </property>
-      <property name="horizontalScrollBarPolicy">
-       <enum>Qt::ScrollBarAsNeeded</enum>
-      </property>
-      <property name="sizeAdjustPolicy">
-       <enum>QAbstractScrollArea::AdjustToContents</enum>
-      </property>
-      <property name="background">
-       <brush brushstyle="SolidPattern">
-        <color alpha="255">
-         <red>66</red>
-         <green>129</green>
-         <blue>66</blue>
-        </color>
-       </brush>
-      </property>
-      <property name="activationOrder">
-       <enum>QMdiArea::ActivationHistoryOrder</enum>
-      </property>
-     </widget>
-    </item>
-   </layout>
-  </widget>
+  <property name="dockNestingEnabled">
+   <bool>true</bool>
+  </property>
+  <widget class="QWidget" name="centralWidget"/>
   <widget class="QMenuBar" name="menuBar">
    <property name="geometry">
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>697</width>
+     <width>402</width>
      <height>18</height>
     </rect>
    </property>
@@ -144,11 +104,6 @@
     <enum>QAction::AboutQtRole</enum>
    </property>
   </action>
-  <action name="actionVisit_homepage">
-   <property name="text">
-    <string>Homepage</string>
-   </property>
-  </action>
   <action name="actionVisit_website">
    <property name="text">
     <string>Visit website</string>
@@ -160,14 +115,6 @@
   <action name="actionAdd_connection">
    <property name="text">
     <string>Add connection</string>
-   </property>
-  </action>
-  <action name="actionRemove_connection">
-   <property name="enabled">
-    <bool>false</bool>
-   </property>
-   <property name="text">
-    <string>Remove connection</string>
    </property>
   </action>
  </widget>

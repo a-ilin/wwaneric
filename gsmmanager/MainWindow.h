@@ -37,14 +37,23 @@ protected:
   void changeEvent(QEvent *e);
   void closeEvent(QCloseEvent *event);
 
+  struct Box
+  {
+    Box() :
+      container(NULL),
+      view(NULL) {}
+
+    QDockWidget * container;
+    IView * view;
+  };
+
   QList<IView *> createViews(const QString& groupName);
-  void removeViews(QTabWidget* container, const QString &groupName);
+  void removeViews(const QList<Box>& boxes, const QString &groupName);
 
   void restore();
   void store();
 
 protected slots:
-  void containerDestroyed(QObject * obj);
   void updateActionTriggered();
   void updatePortStatus(bool opened);
   void addConnection();
@@ -55,25 +64,14 @@ protected slots:
   void trayIconActivated(QSystemTrayIcon::ActivationReason reason);
   void onShowAction();
   void onExitAction();
+  void onRemoveGroupAction();
 
 protected:
   Ui::MainWindow *ui;
 
-  struct Box
-  {
-    Box() :
-      container(NULL),
-      menuGroup(NULL) {}
-
-    QTabWidget * container;
-    QMenu * menuGroup;
-  };
 
   typedef QHash<QString, Box> ContainerHash;
   ContainerHash m_boxes;
-
-  typedef QMultiMap<QTabWidget*, IView*> MapViews;
-  MapViews m_views;
 
   QSystemTrayIcon * m_trayIcon;
   QMenu * m_trayMenu;
