@@ -13,6 +13,37 @@
   <property name="windowTitle">
    <string>wwanEric</string>
   </property>
+  <property name="styleSheet">
+   <string notr="true">QMainWindow::separator::vertical 
+{
+     background :qlineargradient(spread:pad, x1:1, y1:0.5, x2:0, y2:0.5, stop:0 rgba(160, 160, 160, 255), stop:1 rgba(255, 255, 255, 255));
+     width: 5px; /* when vertical */
+     height: 5px; /* when horizontal */
+ 
+     border-radius: 2px;
+}
+ 
+QMainWindow::separator:hover::vertical 
+{
+     background:qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 rgba(100, 100, 100, 255), stop:1 rgba(255, 255, 255, 255));
+}
+ 
+QMainWindow::separator::horizontal
+{
+     background :qlineargradient(spread:pad, x1:0.5, y1:1, x2:0.5, y2:0, stop:0 rgba(160, 160, 160, 255), stop:1 rgba(255, 255, 255, 255));
+     width: 5px; /* when vertical */
+     height: 5px; /* when horizontal */
+ 
+     border-radius: 2px;
+}
+ 
+QMainWindow::separator:hover::horizontal
+{
+     background:qlineargradient(spread:pad, x1:0.5, y1:0, x2:0.5, y2:1, stop:0 rgba(100, 100, 100, 255), stop:1 rgba(255, 255, 255, 255));
+}
+
+</string>
+  </property>
   <property name="dockNestingEnabled">
    <bool>true</bool>
   </property>
@@ -60,7 +91,21 @@
    <addaction name="menuConnections"/>
    <addaction name="menuHelp"/>
   </widget>
-  <widget class="QStatusBar" name="statusBar"/>
+  <widget class="QStatusBar" name="statusBar">
+   <property name="styleSheet">
+    <string notr="true">QStatusBar
+{
+	background: rgb(220, 220, 220);
+}
+
+QStatusBar::item
+{
+    border: 1px solid rgb(180, 180, 180);
+    border-radius: 3px;
+}
+</string>
+   </property>
+  </widget>
   <action name="actionExit">
    <property name="text">
     <string>Exit</string>

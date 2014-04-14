@@ -108,6 +108,7 @@ void MainWindow::closeEvent(QCloseEvent* event)
 QList<IView *> MainWindow::createViews(const QString &groupName)
 {
   QList<IView *> views;
+
   views.append(new ModemStatusView(this));
   views.append(new SmsView(this));
   views.append(new UssdView(this));
@@ -147,16 +148,34 @@ void MainWindow::addViewGroup(const QString &groupName)
       // dock widget create
       QString name = QString("%1 - %2").arg(groupName).arg(view->name());
       QDockWidget * dockWidget = new QDockWidget(name, this);
+
+      const QString dockStyleSheet =
+          "QDockWidget "
+          "{"
+          "  font: bold;"
+          "}"
+          "QDockWidget::title "
+          "{"
+          "  font: bold;"
+          "  background: DarkSeaGreen;"
+          "  padding-left: 10px;"
+          "  padding-top: 4px;"
+          "}"
+          "QDockWidget::close-button "
+          "{"
+          "   background: DarkSeaGreen;"
+          "}"
+          "QDockWidget::float-button "
+          "{"
+          "   background: DarkSeaGreen;"
+          "}"
+          ;
+
+      dockWidget->setStyleSheet(dockStyleSheet);
+
       dockWidget->setWidget(view->widget());
-      dockWidget->setFeatures(dockWidget->features() & ~QDockWidget::DockWidgetClosable);
       addDockWidget(Qt::RightDockWidgetArea, dockWidget);
       dockWidgets.append(dockWidget);
-
-      // toggle action
-      QAction * toggleAction = menuGroup->addAction(view->name());
-      toggleAction->setCheckable(true);
-      toggleAction->setChecked(true);
-      connect(toggleAction, SIGNAL(toggled(bool)), dockWidget, SLOT(setVisible(bool)));
 
       // index
       Box box;
