@@ -14,7 +14,21 @@
    <string>USSD</string>
   </property>
   <layout class="QGridLayout" name="gridLayout">
-   <item row="3" column="3">
+   <item row="3" column="0">
+    <widget class="QLabel" name="labelSessionStatus">
+     <property name="text">
+      <string/>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="3" rowspan="3">
+    <widget class="Line" name="line">
+     <property name="orientation">
+      <enum>Qt::Vertical</enum>
+     </property>
+    </widget>
+   </item>
+   <item row="3" column="4">
     <widget class="QLabel" name="labelPredefinedHint">
      <property name="font">
       <font>
@@ -27,7 +41,24 @@ Double click a cell to send USSD.</string>
      </property>
     </widget>
    </item>
-   <item row="2" column="3">
+   <item row="3" column="2">
+    <widget class="QPushButton" name="pushButtonTerminate">
+     <property name="enabled">
+      <bool>false</bool>
+     </property>
+     <property name="text">
+      <string>Terminate</string>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="4">
+    <widget class="QLabel" name="labelPredefinedUssd">
+     <property name="text">
+      <string>Predefined USSD:</string>
+     </property>
+    </widget>
+   </item>
+   <item row="2" column="4">
     <widget class="UssdTableWidget" name="tableWidget">
      <property name="sizeAdjustPolicy">
       <enum>QAbstractScrollArea::AdjustToContentsOnFirstShow</enum>
@@ -52,45 +83,7 @@ Double click a cell to send USSD.</string>
      </attribute>
     </widget>
    </item>
-   <item row="1" column="3">
-    <widget class="QLabel" name="labelPredefinedUssd">
-     <property name="text">
-      <string>Predefined USSD:</string>
-     </property>
-    </widget>
-   </item>
-   <item row="3" column="0">
-    <widget class="QLabel" name="labelSessionStatus">
-     <property name="text">
-      <string/>
-     </property>
-    </widget>
-   </item>
-   <item row="1" column="2" rowspan="3">
-    <widget class="Line" name="line">
-     <property name="orientation">
-      <enum>Qt::Vertical</enum>
-     </property>
-    </widget>
-   </item>
-   <item row="3" column="1">
-    <widget class="QPushButton" name="pushButtonTerminate">
-     <property name="enabled">
-      <bool>false</bool>
-     </property>
-     <property name="text">
-      <string>Terminate</string>
-     </property>
-    </widget>
-   </item>
-   <item row="2" column="0" colspan="2">
-    <widget class="QPlainTextEdit" name="ussdAnswer">
-     <property name="readOnly">
-      <bool>true</bool>
-     </property>
-    </widget>
-   </item>
-   <item row="1" column="0" colspan="2">
+   <item row="1" column="0" colspan="3">
     <widget class="QLabel" name="labelAnswer">
      <property name="text">
       <string>Answer:</string>
@@ -100,7 +93,14 @@ Double click a cell to send USSD.</string>
      </property>
     </widget>
    </item>
-   <item row="0" column="0" colspan="2">
+   <item row="2" column="0" colspan="3">
+    <widget class="QPlainTextEdit" name="ussdAnswer">
+     <property name="readOnly">
+      <bool>true</bool>
+     </property>
+    </widget>
+   </item>
+   <item row="0" column="0" colspan="3">
     <layout class="QHBoxLayout" name="horizontalLayout">
      <item>
       <widget class="QLabel" name="label">
@@ -124,12 +124,6 @@ Double click a cell to send USSD.</string>
        <property name="text">
         <string>Send</string>
        </property>
-       <property name="autoDefault">
-        <bool>true</bool>
-       </property>
-       <property name="default">
-        <bool>true</bool>
-       </property>
       </widget>
      </item>
      <item>
@@ -150,6 +144,32 @@ Double click a cell to send USSD.</string>
      </item>
     </layout>
    </item>
+   <item row="4" column="0" colspan="5">
+    <spacer name="verticalSpacer">
+     <property name="orientation">
+      <enum>Qt::Vertical</enum>
+     </property>
+     <property name="sizeHint" stdset="0">
+      <size>
+       <width>20</width>
+       <height>40</height>
+      </size>
+     </property>
+    </spacer>
+   </item>
+   <item row="3" column="1">
+    <spacer name="horizontalSpacer">
+     <property name="orientation">
+      <enum>Qt::Horizontal</enum>
+     </property>
+     <property name="sizeHint" stdset="0">
+      <size>
+       <width>40</width>
+       <height>20</height>
+      </size>
+     </property>
+    </spacer>
+   </item>
   </layout>
  </widget>
  <customwidgets>
@@ -162,7 +182,10 @@ Double click a cell to send USSD.</string>
  <tabstops>
   <tabstop>lineEdit</tabstop>
   <tabstop>sendUssdButton</tabstop>
+  <tabstop>addToPredifinedButton</tabstop>
   <tabstop>ussdAnswer</tabstop>
+  <tabstop>pushButtonTerminate</tabstop>
+  <tabstop>tableWidget</tabstop>
  </tabstops>
  <resources/>
  <connections/>
