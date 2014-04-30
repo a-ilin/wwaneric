@@ -16,15 +16,16 @@ enum SMS_STORAGE
   SMS_STORAGE_PHONE = 0x2
 };
 
+bool checkSmsStorage(int storage);
 QString smsStorageStr(SMS_STORAGE storage);
 
 enum SMS_STATUS
 {
-  SMS_STATUS_NEW =    0x0,  // received and not read yet
+  SMS_STATUS_NEW    = 0x0,  // received and not read yet
   SMS_STATUS_INCOME = 0x1,  // received and read
-  SMS_STATUS_DRAFT =  0x2,  // draft
-  SMS_STATUS_SENT =   0x3,  // sent
-  SMS_STATUS_ALL =    0x4   // all
+  SMS_STATUS_DRAFT  = 0x2,  // draft
+  SMS_STATUS_SENT   = 0x3,  // sent
+  SMS_STATUS_ALL    = 0x4   // all
 };
 
 bool checkSmsStatus(int status);
@@ -33,13 +34,13 @@ class SmsMeta
 {
 public:
   SmsMeta();
-  SmsMeta(SMS_STORAGE storage, SMS_STATUS status, int index);
+  SmsMeta(SMS_STORAGE storage, SMS_STATUS status, const QList<int> &indexes);
   virtual ~SmsMeta() {}
 
   bool isValid() const { return m_valid; }
 
   SMS_STORAGE storage() const { return m_storage; }
-  int index() const { return m_index; }
+  QList<int> indexes() const { return m_indexes; }
   SMS_STATUS status() const { return m_status; }
 
   QString userText() const { return m_userText; }
@@ -60,7 +61,7 @@ protected:
   // storage type
   SMS_STORAGE m_storage;
   // index of SMS in storage. Indexes can be sparsed!
-  int m_index;
+  QList<int> m_indexes;
   // SMS status
   SMS_STATUS m_status;
 

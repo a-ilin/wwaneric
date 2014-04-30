@@ -1,5 +1,8 @@
 TEMPLATE = subdirs
 
-SUBDIRS = pdu \
-          gsmmanager
+SUBDIRS = \
+    pdu \
+    libPdu \
+    gsmmanager
+
 

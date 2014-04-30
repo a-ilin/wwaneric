@@ -1,8 +1,8 @@
 ﻿#ifndef USSDVIEW_H
 #define USSDVIEW_H
 
-#include "../IView.h"
-#include "../Ussd.h"
+#include "IView.h"
+#include "Ussd.h"
 
 #include <QWidget>
 
@@ -15,7 +15,7 @@ class UssdView : public QWidget, public IView
   Q_OBJECT
 
 public:
-  explicit UssdView(QWidget *parent = 0);
+  explicit UssdView(const QString &connectionId, QWidget *parent = 0);
   ~UssdView();
 
   void init();
@@ -26,16 +26,23 @@ public:
 
   QWidget * widget() {return this;}
 
-  QString name();
+  QString name() const;
+
+  QString id() const
+  {
+    return "USSD";
+  }
+
+  void processConnectionEvent(Core::ConnectionEvent event, const QVariant &data);
 
 public slots:
   void sendUssd(const QString &ussd);
-  void receivedUssd(const QString &ussdAnswer, USSD_STATUS status);
-  void receivedStatus(USSD_STATUS status);
   void terminateSession();
 
 protected:
   void changeEvent(QEvent *e);
+
+  void receivedUssd(const QString &ussdAnswer, USSD_STATUS status);
 
 protected slots:
   void updateUssd(const QList<Ussd> &ussdList);

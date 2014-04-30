@@ -1,6 +1,7 @@
 ﻿#ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
+#include "Core.h"
 #include "Settings.h"
 
 #include <QMainWindow>
@@ -33,6 +34,17 @@ public:
 
   QSystemTrayIcon* trayIcon() const { return m_trayIcon; }
 
+  void updateConnectionStatus(const QString& connectionId, bool status);
+  void updateSignalStrength(const QString& connectionId, double strengthPercent);
+
+  enum ConnectionColumns
+  {
+    ColumnName,
+    ColumnStatus,
+    ColumnSignalStrength,
+    ColumnLast
+  };
+
 protected:
   void changeEvent(QEvent *e);
   void closeEvent(QCloseEvent *event);
@@ -54,8 +66,6 @@ protected:
   void store();
 
 protected slots:
-  void updateActionTriggered();
-  void updatePortStatus(bool opened);
   void addConnection();
   void showPreferences();
   void visitWebsite();
@@ -65,6 +75,9 @@ protected slots:
   void onShowAction();
   void onExitAction();
   void onRemoveGroupAction();
+  void onConnectionEvent(const QString &connectionId,
+                         Core::ConnectionEvent event,
+                         const QVariant &data);
 
 protected:
   Ui::MainWindow *ui;

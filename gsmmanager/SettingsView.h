@@ -1,7 +1,7 @@
 ﻿#ifndef SETTINGSVIEW_H
 #define SETTINGSVIEW_H
 
-#include "../IView.h"
+#include "IView.h"
 
 #include <QWidget>
 
@@ -15,7 +15,7 @@ class SettingsView : public QWidget, public IView
   Q_OBJECT
 
 public:
-  explicit SettingsView(QWidget *parent = 0);
+  explicit SettingsView(const QString &connectionId, QWidget *parent = 0);
   ~SettingsView();
 
   void init();
@@ -26,7 +26,14 @@ public:
 
   QWidget * widget() {return this;}
 
-  QString name();
+  QString name() const;
+
+  QString id() const
+  {
+    return "Settings";
+  }
+
+  void processConnectionEvent(Core::ConnectionEvent event, const QVariant &data);
 
 public slots:
 
@@ -42,7 +49,6 @@ private:
 private slots:
   void openPortClicked();
   void closePortClicked();
-  void updatePortStatus(bool opened);
 
   void defaultCheckBoxStateChanged(int state);
 

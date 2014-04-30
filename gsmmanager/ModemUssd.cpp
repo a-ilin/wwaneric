@@ -3,112 +3,8 @@
 #define CMD_USSD_SEND "AT+CUSD=%1,\"%2\",15"
 
 
-bool UssdConversationHandler::processConversation(ModemRequest *request, const Conversation &c, bool &requestFinished)
-{
-  const int& requestType = request->requestType;
-  //const UssdArgs* ussdArgs = static_cast<UssdArgs*> (request->requestArgs);
 
-  bool success = false;
-
-  if (requestType == USSD_REQUEST_SEND)
-  {
-    if (c.status == Conversation::OK)
-    {
-      if (c.data.size() > 0)
-      {
-        QString answer;
-        USSD_STATUS status;
-        if (processUssdData(c.data.first(), answer, status))
-        {
-          emit updatedUssd(answer, status);
-          requestFinished = true;
-          success = true;
-        }
-      }
-      // it can be just a confirmation of our termination request processing
-      else
-      {
-        QString answer;
-        USSD_STATUS status;
-        if (processUssdData(c.request, answer, status))
-        {
-          emit updatedUssd(answer, status);
-          requestFinished = true;
-          success = true;
-        }
-      }
-
-      if (!success)
-      {
-        emit updatedUssd(tr("Cannot parse modem answer"), USSD_STATUS_LAST);
-      }
-    }
-    else
-    {
-      emit updatedUssd(tr("ERROR"), USSD_STATUS_DIALOGUE_TERMINATED);
-    }
-  }
-
-  return success;
-}
-
-QByteArray UssdConversationHandler::requestData(const ModemRequest *request) const
-{
-  const int &requestType = request->requestType;
-  const UssdArgs *ussdArgs = static_cast<const UssdArgs*> (request->requestArgs);
-
-  QByteArray data;
-
-  if (requestType == USSD_REQUEST_SEND)
-  {
-    data = QString(CMD_USSD_SEND).arg(ussdArgs->status).arg(ussdArgs->ussd).toLatin1();
-  }
-
-  return data;
-}
-
-int UssdConversationHandler::requestTypesCount() const
-{
-  return USSD_REQUEST_LAST;
-}
-
-QString UssdConversationHandler::name() const
-{
-  return QString(USSD_HANDLER_NAME);
-}
-
-bool UssdConversationHandler::processUnexpectedData(const QByteArray& data)
-{
-  QString msg;
-  USSD_STATUS status;
-
-  if (processUssdData(QString(data), msg, status))
-  {
-    if (msg.size() > 0)
-    {
-      emit updatedUssd(msg, status);
-    }
-    else
-    {
-      emit updatedStatus(status);
-    }
-
-    return true;
-  }
-
-  return false;
-}
-
-void UssdConversationHandler::sendUssd(const QString &ussd, USSD_SEND_STATUS status)
-{
-  UssdArgs * ussdArgs = static_cast<UssdArgs*> (requestArgs());
-  ussdArgs->ussd = ussd;
-  ussdArgs->status = status;
-
-  modem()->appendRequest(createEmptyRequest(USSD_REQUEST_SEND, ussdArgs));
-}
-
-bool UssdConversationHandler::processUssdData(const QString& data, QString& msg, USSD_STATUS& status) const
+static bool processUssdData(const QString& data, QString& msg, USSD_STATUS& status)
 {
   bool result = false;
   QStringList headerLine = parseAnswerLine(data, "+CUSD:");
@@ -142,8 +38,96 @@ bool UssdConversationHandler::processUssdData(const QString& data, QString& msg,
   return result;
 }
 
-RequestArgs *UssdConversationHandler::requestArgs() const
+
+void UssdConversationHandler::processConversation(ModemRequest *request,
+                                                  const Conversation &c,
+                                                  ModemRequest::Status& status,
+                                                  AnswerData*& answerData) const
 {
+  const int requestType = request->type();
+  //const UssdArgs* ussdArgs = static_cast<UssdArgs*> (request->requestArgs);
+
+  status = ModemRequest::Failure;
+
+  if (requestType == USSD_REQUEST_SEND)
+  {
+    if (c.status == Conversation::OK)
+    {
+      QByteArray toProcess;
+      if (c.data.size() > 0)
+      {
+        toProcess = c.data.first();
+      }
+      // it can be just a confirmation of our termination request processing
+      else
+      {
+        toProcess = c.request;
+      }
+
+      QString msg;
+      USSD_STATUS ussdStatus;
+      if (processUssdData(toProcess, msg, ussdStatus))
+      {
+        UssdAnswer * answer = new UssdAnswer();
+        answer->status = ussdStatus;
+        answer->ussd = msg;
+        answerData = answer;
+
+        status = ModemRequest::SuccessCompleted;
+      }
+    }
+  }
+}
+
+QByteArray UssdConversationHandler::requestData(const ModemRequest *request) const
+{
+  const int requestType = request->type();
+  const UssdArgs *ussdArgs = static_cast<const UssdArgs*> (request->args());
+
+  QByteArray data;
+
+  if (requestType == USSD_REQUEST_SEND)
+  {
+    data = QString(CMD_USSD_SEND).arg(ussdArgs->status).arg(ussdArgs->ussd).toLatin1();
+  }
+
+  return data;
+}
+
+int UssdConversationHandler::requestTypesCount() const
+{
+  return USSD_REQUEST_LAST;
+}
+
+QString UssdConversationHandler::name() const
+{
+  return QString(USSD_HANDLER_NAME);
+}
+
+RequestArgs *UssdConversationHandler::requestArgs(int type) const
+{
+  Q_UNUSED(type);
   return new UssdArgs();
 }
 
+bool UssdConversationHandler::processUnexpectedData(const QByteArray& data,
+                                                    int &replyType,
+                                                    AnswerData* &answerData) const
+{
+  QString msg;
+  USSD_STATUS status;
+
+  if (processUssdData(QString(data), msg, status))
+  {
+    replyType = USSD_REQUEST_SEND;
+
+    UssdAnswer * answer = new UssdAnswer();
+    answer->status = status;
+    answer->ussd = msg;
+    answerData = answer;
+
+    return true;
+  }
+
+  return false;
+}

@@ -108,12 +108,12 @@ PortController::PortController() :
 }
 
 
-void PortController::setPortName(const QString &portName)
+void PortController::setPortName(const QString portName)
 {
   m_serialPort->setPortName(portName);
 }
 
-void PortController::setPortOptions(const PortOptions& options)
+void PortController::setPortOptions(const PortOptions options)
 {
   m_options = options;
 }

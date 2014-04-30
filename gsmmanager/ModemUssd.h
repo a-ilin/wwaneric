@@ -13,36 +13,40 @@ enum USSD_REQUEST_TYPE
   USSD_REQUEST_LAST  // a value for type counting. not a real request type.
 };
 
+struct UssdAnswer : public AnswerData
+{
+  QString ussd;
+  USSD_STATUS status;
+};
+
 struct UssdArgs : public RequestArgs
 {
   QString ussd;
   USSD_SEND_STATUS status;
 };
 
-class UssdConversationHandler : public ConversationHandler, public UnexpectedDataHandler
+class UssdConversationHandler : public ConversationHandler
 {
-  Q_OBJECT
-
 public:
-  bool processConversation(ModemRequest *request, const Conversation &c, bool &requestFinished);
+  void processConversation(ModemRequest *request,
+                           const Conversation &c,
+                           ModemRequest::Status &status,
+                           AnswerData* &answerData) const;
+
   QByteArray requestData(const ModemRequest *request) const;
   int requestTypesCount() const;
   QString name() const;
 
-  bool processUnexpectedData(const QByteArray& data);
-
-public slots:
-  void sendUssd(const QString &ussd, USSD_SEND_STATUS status);
-
-signals:
-  void updatedUssd(const QString &ussd, USSD_STATUS status);
-  void updatedStatus(USSD_STATUS status);
+  bool processUnexpectedData(const QByteArray& data,
+                             int &replyType,
+                             AnswerData* &answerData) const;
 
 protected:
-  bool processUssdData(const QString &data, QString &msg, USSD_STATUS &status) const;
-
-protected:
-  RequestArgs* requestArgs() const;
+  RequestArgs* requestArgs(int type) const;
 };
+
+
+
+
 
 #endif // MODEMUSSD_H

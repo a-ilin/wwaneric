@@ -1,8 +1,8 @@
 ﻿#include "UssdView.h"
 #include "ui_UssdView.h"
 
-#include "../Core.h"
-#include "../ModemUssd.h"
+#include "Core.h"
+#include "ModemUssd.h"
 
 #include <QContextMenuEvent>
 #include <QKeyEvent>
@@ -14,9 +14,9 @@
 #define TABLE_COLUMN_USSD 0
 #define TABLE_COLUMN_DESCRIPTION 1
 
-UssdView::UssdView(QWidget *parent) :
+UssdView::UssdView(const QString& connectionId, QWidget *parent) :
   QWidget(parent),
-  IView(),
+  IView(connectionId),
   ui(new Ui::UssdView)
 {
   ui->setupUi(this);
@@ -60,12 +60,6 @@ void UssdView::changeEvent(QEvent *e)
 
 void UssdView::init()
 {
-  Modem * modem = Core::instance()->modem();
-  UssdConversationHandler * ussdHandler =
-      static_cast<UssdConversationHandler*> (Core::instance()->conversationHandler(modem, USSD_HANDLER_NAME));
-
-  connect(ussdHandler, SIGNAL(updatedUssd(QString,USSD_STATUS)), SLOT(receivedUssd(QString,USSD_STATUS)));
-  connect(ussdHandler, SIGNAL(updatedStatus(USSD_STATUS)), SLOT(receivedStatus(USSD_STATUS)));
 }
 
 void UssdView::tini()
@@ -87,9 +81,42 @@ void UssdView::store(Settings & /*set*/)
 
 }
 
-QString UssdView::name()
+QString UssdView::name() const
 {
   return tr("USSD");
+}
+
+void UssdView::processConnectionEvent(Core::ConnectionEvent event, const QVariant& data)
+{
+  if (event == Core::ConnectionEventCustom)
+  {
+    ModemReply* reply = data.value<ModemReply*>();
+    Q_ASSERT(reply);
+
+    if ((reply->handlerName() == USSD_HANDLER_NAME))
+    {
+      const QString errStr = tr("<ERROR>");
+      UssdAnswer * ussdAnswer = static_cast<UssdAnswer*> (reply->data());
+
+      switch(reply->type())
+      {
+      case USSD_REQUEST_SEND:
+      {
+        if (reply->status())
+        {
+          receivedUssd(ussdAnswer->ussd, ussdAnswer->status);
+        }
+        else
+        {
+          receivedUssd(errStr, USSD_STATUS_DIALOGUE_TERMINATED);
+        }
+      }
+        break;
+      default:
+        Q_LOGEX(LOG_VERBOSE_CRITICAL, "Unknown reply type received!");
+      }
+    }
+  }
 }
 
 void UssdView::sendUssd(const QString &ussd)
@@ -99,12 +126,17 @@ void UssdView::sendUssd(const QString &ussd)
                              .arg(tr("Sent:")));
   ui->ussdAnswer->appendPlainText(ussd);
 
-  Modem * modem = Core::instance()->modem();
-  UssdConversationHandler * ussdHandler =
-      static_cast<UssdConversationHandler*> (Core::instance()->conversationHandler(modem, USSD_HANDLER_NAME));
 
-  receivedStatus(USSD_STATUS_USER_ACTION_NEEDED);
-  ussdHandler->sendUssd(ussd, USSD_SEND_STATUS_CODE_PRESENTATION_ON);
+  ModemRequest * request = Core::instance()->modemRequest(connectionId(), USSD_HANDLER_NAME,
+                                                          USSD_REQUEST_SEND, 1);
+
+  UssdArgs * ussdArgs = static_cast<UssdArgs*> (request->args());
+  ussdArgs->ussd = ussd;
+  ussdArgs->status = USSD_SEND_STATUS_CODE_PRESENTATION_ON;
+
+  Core::instance()->pushRequest(request);
+
+  receivedUssd(QString(), USSD_STATUS_USER_ACTION_NEEDED);
 }
 
 void UssdView::receivedUssd(const QString &ussdAnswer, USSD_STATUS status)
@@ -117,11 +149,6 @@ void UssdView::receivedUssd(const QString &ussdAnswer, USSD_STATUS status)
     ui->ussdAnswer->appendPlainText(ussdAnswer);
   }
 
-  receivedStatus(status);
-}
-
-void UssdView::receivedStatus(USSD_STATUS status)
-{
   QString statusStr;
 
   switch(status)
@@ -160,12 +187,16 @@ void UssdView::receivedStatus(USSD_STATUS status)
 
 void UssdView::terminateSession()
 {
-  Modem * modem = Core::instance()->modem();
-  UssdConversationHandler * ussdHandler =
-      static_cast<UssdConversationHandler*> (Core::instance()->conversationHandler(modem, USSD_HANDLER_NAME));
+  ModemRequest * request = Core::instance()->modemRequest(connectionId(), USSD_HANDLER_NAME,
+                                                          USSD_REQUEST_SEND, 1);
 
-  receivedStatus(USSD_STATUS_DIALOGUE_TERMINATED);
-  ussdHandler->sendUssd("", USSD_SEND_STATUS_DIALOGUE_TERMINATE);
+  UssdArgs * ussdArgs = static_cast<UssdArgs*> (request->args());
+  ussdArgs->ussd = QString();
+  ussdArgs->status = USSD_SEND_STATUS_DIALOGUE_TERMINATE;
+
+  Core::instance()->pushRequest(request);
+
+  receivedUssd(QString(), USSD_STATUS_DIALOGUE_TERMINATED);
 }
 
 void UssdView::updateUssd(const QList<Ussd> &ussdList)

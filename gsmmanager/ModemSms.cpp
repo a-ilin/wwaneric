@@ -5,17 +5,16 @@
 #define CMD_SMS_READ_BY_STATUS          "AT+CMGL=%1"
 #define CMD_SMS_DELETE_BY_INDEX         "AT+CMGD=%1,0"
 
-bool SmsConversationHandler::processConversation(ModemRequest *request, const Conversation &c, bool &requestFinished)
+void SmsConversationHandler::processConversation(ModemRequest *request,
+                                                 const Conversation &c,
+                                                 ModemRequest::Status& status,
+                                                 AnswerData*& answerData) const
 {
-  const int& requestType = request->requestType;
-  int& requestStage = request->requestStage;
-  const SmsArgs* smsArgs = static_cast<SmsArgs*> (request->requestArgs);
-
-  bool success = false;
+  status = ModemRequest::Failure;
 
   if (c.status == Conversation::OK)
   {
-    if ((requestType == SMS_REQUEST_CAPACITY) && (c.data.size() > 0))
+    if ((request->type() == SMS_REQUEST_CAPACITY) && (c.data.size() > 0))
     {
       QStringList storageLine = parseAnswerLine(c.data.first(), "+CPMS:");
       const int blockSize = 3;
@@ -61,28 +60,33 @@ bool SmsConversationHandler::processConversation(ModemRequest *request, const Co
 
       if (answerDecoded)
       {
-        emit updatedSmsCapacity(simUsed, simTotal, phoneUsed, phoneTotal);
-        success = true;
-        requestFinished = true;
+        SmsAnswerCapacity * answer = new SmsAnswerCapacity();
+        answer->simUsed = simUsed;
+        answer->simTotal = simTotal;
+        answer->phoneUsed = phoneUsed;
+        answer->phoneTotal = phoneTotal;
+        answerData = answer;
+        status = ModemRequest::SuccessCompleted;
       }
       else
       {
         Q_LOGEX(LOG_VERBOSE_ERROR, "Cannot decode modem answer for storage capacity request!");
       }
     }
-    else if ((requestType == SMS_REQUEST_READ) && (c.data.size() > 0))
+    else if ((request->type() == SMS_REQUEST_READ) && (c.data.size() > 0))
     {
+      const SmsArgsRead* smsArgs = static_cast<SmsArgsRead*> (request->args());
+
       // set preferred storage
-      if (requestStage == 0)
+      if (request->stage() == 0)
       {
-        requestStage = 1;
-        success = true;
-        requestFinished = false;
+        request->setStage(1);
+        status = ModemRequest::SuccessNeedMoreData;
       }
       // read SMSes
-      else if (requestStage == 1)
+      else if (request->stage() == 1)
       {
-        QList <Sms> smsList;
+        QList<Sms> smsList;
         int answerDecoded = true;
         int smsLineCount = c.data.size();
         if ((smsLineCount > 0) && (!(smsLineCount % 2)))  // each SMS has 2 lines: header and PDU
@@ -124,44 +128,45 @@ bool SmsConversationHandler::processConversation(ModemRequest *request, const Co
         if (answerDecoded == false)
         {
           // reset stage to initial
-          requestStage = 0;
+          request->setStage(0);
           Q_LOGEX(LOG_VERBOSE_ERROR, "Error processing SMS answer!");
         }
         else
         {
-          emit updatedSms(smsList);
-          success = true;
-          requestFinished = true;
+          SmsAnswerRead * answer = new SmsAnswerRead();
+          answer->smsList = smsList;
+          answerData = answer;
+          status = ModemRequest::SuccessCompleted;
         }
       }
     }
-    else if (requestType == SMS_REQUEST_DELETE)
+    else if (request->type() == SMS_REQUEST_DELETE)
     {
+      const SmsArgsDelete* smsArgs = static_cast<SmsArgsDelete*> (request->args());
+
       // set preferred storage
-      if (requestStage == 0)
+      if (request->stage() == 0)
       {
-        requestStage = 1;
-        success = true;
-        requestFinished = false;
+        request->setStage(1);
+        status = ModemRequest::SuccessNeedMoreData;
       }
       // read SMSes
-      else if (requestStage == 1)
+      else if (request->stage() == 1)
       {
-        emit deletedSms(smsArgs->smsStorage, smsArgs->smsIndex);
-        success = true;
-        requestFinished = true;
+        SmsAnswerDeleted * answer = new SmsAnswerDeleted();
+        answer->smsStorage = smsArgs->smsStorage;
+        answer->smsIndex = smsArgs->smsIndex;
+        answerData = answer;
+        status = ModemRequest::SuccessCompleted;
       }
     }
   }
-
-  return success;
 }
 
 QByteArray SmsConversationHandler::requestData(const ModemRequest *request) const
 {
-  const int &requestType = request->requestType;
-  const SmsArgs *smsArgs = static_cast<const SmsArgs*> (request->requestArgs);
-  const int &requestStage = request->requestStage;
+  const int requestType = request->type();
+  const int requestStage = request->stage();
 
   QByteArray data;
 
@@ -171,6 +176,8 @@ QByteArray SmsConversationHandler::requestData(const ModemRequest *request) cons
   }
   else if (requestType == SMS_REQUEST_READ)
   {
+    const SmsArgsRead *smsArgs = static_cast<const SmsArgsRead*> (request->args());
+
     if (requestStage == 0)
     {
       data = QString(CMD_SMS_SET_PREFERRED_STORAGE)
@@ -188,6 +195,8 @@ QByteArray SmsConversationHandler::requestData(const ModemRequest *request) cons
   }
   else if (requestType == SMS_REQUEST_DELETE)
   {
+    const SmsArgsDelete *smsArgs = static_cast<const SmsArgsDelete*> (request->args());
+
     if (requestStage == 0)
     {
       data = QString(CMD_SMS_SET_PREFERRED_STORAGE)
@@ -217,35 +226,15 @@ QString SmsConversationHandler::name() const
   return QString(SMS_HANDLER_NAME);
 }
 
-RequestArgs* SmsConversationHandler::requestArgs() const
+RequestArgs* SmsConversationHandler::requestArgs(int type) const
 {
-  return new SmsArgs();
-}
-
-void SmsConversationHandler::updateSms(SMS_STORAGE storage, SMS_STATUS status)
-{
-  SmsArgs * smsArgs = static_cast<SmsArgs*> (requestArgs());
-  smsArgs->smsStorage = storage;
-  smsArgs->smsStatus = status;
-
-  modem()->appendRequest(createEmptyRequest(SMS_REQUEST_READ, smsArgs));
-}
-
-void SmsConversationHandler::updateSmsCapacity()
-{
-  modem()->appendRequest(createEmptyRequest(SMS_REQUEST_CAPACITY));
-}
-
-void SmsConversationHandler::sendSms(const Sms &sms)
-{
-
-}
-
-void SmsConversationHandler::deleteSms(SMS_STORAGE storage, int index)
-{
-  SmsArgs * smsArgs = static_cast<SmsArgs*> (requestArgs());
-  smsArgs->smsStorage = storage;
-  smsArgs->smsIndex = index;
-
-  modem()->appendRequest(createEmptyRequest(SMS_REQUEST_DELETE, smsArgs));
+  switch(type)
+  {
+  case SMS_REQUEST_READ:
+    return new SmsArgsRead();
+  case SMS_REQUEST_DELETE:
+    return new SmsArgsDelete();
+  default:
+    return NULL;
+  }
 }

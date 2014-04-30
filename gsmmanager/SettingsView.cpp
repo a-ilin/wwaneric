@@ -1,19 +1,19 @@
 ﻿#include "SettingsView.h"
 #include "ui_SettingsView.h"
 
-#include "../common.h"
+#include "common.h"
 
-#include "../Core.h"
-#include "../MainWindow.h"
+#include "Core.h"
+#include "MainWindow.h"
 
 #include <QtSerialPort/QSerialPortInfo>
 #include <QTimer>
 
 #define DEFAULT_TO_CB_LINK_PROPERTY "defaultToCheckBoxLink"
 
-SettingsView::SettingsView(QWidget *parent) :
+SettingsView::SettingsView(const QString& connectionId, QWidget *parent) :
   QWidget(parent),
-  IView(),
+  IView(connectionId),
   ui(new Ui::SettingsView)
 {
   ui->setupUi(this);
@@ -21,6 +21,9 @@ SettingsView::SettingsView(QWidget *parent) :
 
   connect(ui->openButton, SIGNAL(clicked()), this, SLOT(openPortClicked()));
   connect(ui->closeButton, SIGNAL(clicked()), this, SLOT(closePortClicked()));
+
+  connect(ui->showAdvancedSettings, SIGNAL(toggled(bool)), ui->advancedSettings, SLOT(setVisible(bool)));
+  ui->showAdvancedSettings->setChecked(false);
 }
 
 SettingsView::~SettingsView()
@@ -43,10 +46,6 @@ void SettingsView::changeEvent(QEvent *e)
 
 void SettingsView::init()
 {
-  Modem * modem = Core::instance()->modem();
-  connect(modem, SIGNAL(updatedPortStatus(bool)),
-          this, SLOT(updatePortStatus(bool)));
-
   // baud rate
   ui->baudRate->addItem("1200",   QSerialPort::Baud1200);
   ui->baudRate->addItem("2400",   QSerialPort::Baud2400);
@@ -185,14 +184,35 @@ void SettingsView::store(Settings &set)
   STORE_ADV_OPTION(stopBits,    StopBits);
 }
 
-QString SettingsView::name()
+QString SettingsView::name() const
 {
   return tr("Settings");
 }
 
+void SettingsView::processConnectionEvent(Core::ConnectionEvent event, const QVariant& data)
+{
+  if (event == Core::ConnectionEventStatus)
+  {
+    bool opened = data.toBool();
+
+    if (opened)
+    {
+      ui->labelComPortStatus->setText(tr("Port opened. Modem status OK."));
+    }
+    else
+    {
+      ui->labelComPortStatus->setText(tr("Port closed."));
+    }
+
+    ui->openButton->setEnabled(!opened);
+    ui->cbComPort->setEnabled(!opened);
+    ui->advancedSettings->setEnabled(!opened);
+    ui->closeButton->setEnabled(opened);
+  }
+}
+
 void SettingsView::openPortClicked()
 {
-  Modem * modem = Core::instance()->modem();
   QString portName = ui->cbComPort->currentData().toString();
 
   PortOptions options;
@@ -207,33 +227,12 @@ void SettingsView::openPortClicked()
   options.stopBits           = (QSerialPort::StopBits)ui->stopBits->currentData().toInt();
   options.stopBitsDefault    = ui->stopBitsDefault->isChecked();
 
-  modem->setPortOptions(options);
-  modem->setPortName(portName);
-  modem->openPort();
+  Core::instance()->openConnection(connectionId(), portName, options);
 }
 
 void SettingsView::closePortClicked()
 {
-  Core::instance()->modem()->closePort();
-}
-
-void SettingsView::updatePortStatus(bool opened)
-{
-  Modem * modem = Core::instance()->modem();
-
-  if (opened)
-  {
-    ui->labelComPortStatus->setText(tr("Port %1 opened. Modem status OK.").arg(modem->portName()));
-  }
-  else
-  {
-    ui->labelComPortStatus->setText(tr("Port %1 closed.").arg(modem->portName()));
-  }
-
-  ui->openButton->setEnabled(!opened);
-  ui->cbComPort->setEnabled(!opened);
-  ui->advancedSettings->setEnabled(!opened);
-  ui->closeButton->setEnabled(opened);
+  Core::instance()->closeConnection(connectionId());
 }
 
 void SettingsView::defaultCheckBoxStateChanged(int state)

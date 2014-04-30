@@ -1,14 +1,15 @@
 ﻿#include "MainWindow.h"
 #include "ui_MainWindow.h"
 
-#include "Core.h"
 #include "Modem.h"
 
 #include "IView.h"
-#include "views/ModemStatusView.h"
-#include "views/SmsView.h"
-#include "views/UssdView.h"
-#include "views/SettingsView.h"
+#include "ModemStatusView.h"
+#include "SmsView.h"
+#include "UssdView.h"
+#include "SettingsView.h"
+
+#include "ModemStatus.h"
 
 #include "AppSettingsDialog.h"
 
@@ -25,6 +26,7 @@
 #endif
 
 #define SET_GROUP_PREFIX "grp_"
+#define SET_VIEW_PREFIX  "view_"
 
 MainWindow::MainWindow(QWidget *parent) :
   QMainWindow(parent),
@@ -46,14 +48,12 @@ MainWindow::MainWindow(QWidget *parent) :
   m_trayMenu = new QMenu(this);
   m_trayMenu->addAction(showAction);
   m_trayMenu->addSeparator();
-  m_trayMenu->addAction(ui->actionUpdate);
   m_trayMenu->addAction(ui->actionExit);
   m_trayMenu->setDefaultAction(showAction);
 
   m_trayIcon->setContextMenu(m_trayMenu);
 
   // main menu actions
-  connect(ui->actionUpdate, SIGNAL(triggered()), SLOT(updateActionTriggered()));
   connect(ui->actionExit, SIGNAL(triggered()), SLOT(onExitAction()));
   connect(ui->actionAdd_connection, SIGNAL(triggered()), SLOT(addConnection()));
   connect(ui->actionPreferences, SIGNAL(triggered()), SLOT(showPreferences()));
@@ -61,10 +61,51 @@ MainWindow::MainWindow(QWidget *parent) :
   connect(ui->actionAbout, SIGNAL(triggered()), SLOT(showAbout()));
   connect(ui->actionAbout_Qt, SIGNAL(triggered()), SLOT(showAboutQt()));
 
-  setTabPosition(Qt::AllDockWidgetAreas, QTabWidget::North);
+  // UI
   setTabShape(QTabWidget::Triangular);
-  setDocumentMode(true);
+  setDockNestingEnabled(true);
 
+  // connections widget
+  ui->connectionsWidget->setColumnCount(ColumnLast);
+
+  // Core connections
+  connect(Core::instance(), SIGNAL(connectionEvent(QString,Core::ConnectionEvent,QVariant)),
+          this, SLOT(onConnectionEvent(QString,Core::ConnectionEvent,QVariant)),
+          Qt::DirectConnection);
+
+  // application style sheet
+  QString appStyleSheet =
+      /* UI background color */
+      "QComboBox, QLineEdit, QListView, QPlainTextEdit, QTableView"
+      "{"
+      "background-color: rgb(255, 255, 240);"
+      "}"
+
+      /* QDockWidget title, handle, buttons */
+      "QDockWidget "
+      "{"
+      "  font: bold;"
+      "}"
+      "QDockWidget::title "
+      "{"
+      "  font: bold;"
+      "  background: DarkSeaGreen;"
+      "  padding-left: 10px;"
+      "  padding-top: 4px;"
+      "}"
+      "QDockWidget::close-button "
+      "{"
+      "   background: DarkSeaGreen;"
+      "}"
+      "QDockWidget::float-button "
+      "{"
+      "   background: DarkSeaGreen;"
+      "}"
+      ;
+
+  qApp->setStyleSheet(appStyleSheet);
+
+  // debug windows
 #ifdef QT_DEBUG
   DebugParsers * dbgParsers = new DebugParsers(this);
 
@@ -109,10 +150,10 @@ QList<IView *> MainWindow::createViews(const QString &groupName)
 {
   QList<IView *> views;
 
-  views.append(new ModemStatusView(this));
-  views.append(new SmsView(this));
-  views.append(new UssdView(this));
-  views.append(new SettingsView(this));
+  views.append(new ModemStatusView(groupName, this));
+  views.append(new SmsView(groupName, this));
+  views.append(new UssdView(groupName, this));
+  views.append(new SettingsView(groupName, this));
 
   Settings set;
 
@@ -121,7 +162,10 @@ QList<IView *> MainWindow::createViews(const QString &groupName)
   foreach(IView* view, views)
   {
     view->init();
+
+    set.beginGroup(QString(SET_VIEW_PREFIX) + view->id());
     view->restore(set);
+    set.endGroup();
   }
 
   set.endGroup();
@@ -134,6 +178,9 @@ void MainWindow::addViewGroup(const QString &groupName)
   // create new one
   if(!m_boxes.contains(groupName))
   {
+    // core connection
+    Core::instance()->createConnection(groupName);
+
     // group menu
     QMenu * menuGroup = new QMenu(groupName, this);
     ui->menuConnections->addMenu(menuGroup);
@@ -148,32 +195,9 @@ void MainWindow::addViewGroup(const QString &groupName)
       // dock widget create
       QString name = QString("%1 - %2").arg(groupName).arg(view->name());
       QDockWidget * dockWidget = new QDockWidget(name, this);
-
-      const QString dockStyleSheet =
-          "QDockWidget "
-          "{"
-          "  font: bold;"
-          "}"
-          "QDockWidget::title "
-          "{"
-          "  font: bold;"
-          "  background: DarkSeaGreen;"
-          "  padding-left: 10px;"
-          "  padding-top: 4px;"
-          "}"
-          "QDockWidget::close-button "
-          "{"
-          "   background: DarkSeaGreen;"
-          "}"
-          "QDockWidget::float-button "
-          "{"
-          "   background: DarkSeaGreen;"
-          "}"
-          ;
-
-      dockWidget->setStyleSheet(dockStyleSheet);
-
+      dockWidget->setObjectName(view->id());
       dockWidget->setWidget(view->widget());
+      dockWidget->setAllowedAreas(Qt::RightDockWidgetArea | Qt::BottomDockWidgetArea);
       addDockWidget(Qt::RightDockWidgetArea, dockWidget);
       dockWidgets.append(dockWidget);
 
@@ -198,7 +222,26 @@ void MainWindow::addViewGroup(const QString &groupName)
     menuGroup->addSeparator();
     QAction * removeAction = menuGroup->addAction(tr("Remove connection"));
     removeAction->setData(groupName);
+    removeAction->setIcon(QIcon("icons/application_delete_connection.png"));
     connect(removeAction, SIGNAL(triggered()), SLOT(onRemoveGroupAction()));
+
+    // connection widget item
+    {
+      int row = ui->connectionsWidget->rowCount();
+      ui->connectionsWidget->setRowCount(row + 1);
+
+      QTableWidgetItem * itemName = new QTableWidgetItem(groupName);
+      ui->connectionsWidget->setItem(row, ColumnName, itemName);
+
+      QTableWidgetItem * itemStatus = new QTableWidgetItem(QString());
+      ui->connectionsWidget->setItem(row, ColumnStatus, itemStatus);
+
+      QTableWidgetItem * itemSignal = new QTableWidgetItem(QString());
+      ui->connectionsWidget->setItem(row, ColumnSignalStrength, itemSignal);
+
+      updateConnectionStatus(groupName, false);
+      updateSignalStrength(groupName, 0.0);
+    }
   }
 }
 
@@ -210,7 +253,11 @@ void MainWindow::removeViews(const QList<Box> & boxes, const QString& groupName)
   foreach(const Box &box, boxes)
   {
     IView * view = box.view;
+
+    set.beginGroup(QString(SET_VIEW_PREFIX) + view->id());
     view->store(set);
+    set.endGroup();
+
     view->tini();
     delete view;
   }
@@ -231,6 +278,12 @@ void MainWindow::restore()
   {
     addViewGroup(grp);
   }
+
+  // geometry, state
+  set.beginGroup(SET_MAINWINDOW_GROUP);
+  restoreGeometry(set.value("windowGeometry").toByteArray());
+  restoreState(set.value("windowState").toByteArray());
+  set.endGroup();
 }
 
 void MainWindow::store()
@@ -242,7 +295,81 @@ void MainWindow::store()
 
   QStringList groups = m_boxes.uniqueKeys();
   set.setValue("groups", groups);
+
+  // geometry, state
+  set.setValue("windowGeometry", saveGeometry());
+  set.setValue("windowState", saveState());
+
   set.endGroup();
+}
+
+void MainWindow::updateConnectionStatus(const QString& connectionId, bool status)
+{
+  QList<QTableWidgetItem*> items = ui->connectionsWidget->findItems(connectionId,
+                                                                    Qt::MatchExactly);
+
+  Q_ASSERT(items.size() == 1);
+  int row = items.at(0)->row();
+
+  QTableWidgetItem * statusItem = ui->connectionsWidget->item(row, ColumnStatus);
+  Q_ASSERT(statusItem);
+
+  if (status)
+  {
+    statusItem->setIcon(QIcon("icons/port_opened.png"));
+    statusItem->setToolTip(tr("Port opened"));
+  }
+  else
+  {
+    statusItem->setIcon(QIcon("icons/port_closed.png"));
+    statusItem->setToolTip(tr("Port closed"));
+  }
+
+  ui->connectionsWidget->resizeColumnsToContents();
+}
+
+void MainWindow::updateSignalStrength(const QString& connectionId, double strengthPercent)
+{
+  QIcon signalIcon;
+
+  if (strengthPercent <= 0.1)
+  {
+    signalIcon = QIcon("icons/signal_strength_000.png");
+  }
+  else if (strengthPercent <= 20)
+  {
+    signalIcon = QIcon("icons/signal_strength_020.png");
+  }
+  else if (strengthPercent <= 40)
+  {
+    signalIcon = QIcon("icons/signal_strength_040.png");
+  }
+  else if (strengthPercent <= 60)
+  {
+    signalIcon = QIcon("icons/signal_strength_060.png");
+  }
+  else if (strengthPercent <= 80)
+  {
+    signalIcon = QIcon("icons/signal_strength_080.png");
+  }
+  else
+  {
+    signalIcon = QIcon("icons/signal_strength_100.png");
+  }
+
+  QList<QTableWidgetItem*> items = ui->connectionsWidget->findItems(connectionId,
+                                                                    Qt::MatchExactly);
+
+  Q_ASSERT(items.size() == 1);
+  int row = items.at(0)->row();
+
+  QTableWidgetItem * signalItem = ui->connectionsWidget->item(row, ColumnSignalStrength);
+  Q_ASSERT(signalItem);
+
+  signalItem->setIcon(signalIcon);
+  signalItem->setToolTip(tr("Signal strength: %1%").arg((int)strengthPercent));
+
+  ui->connectionsWidget->resizeColumnsToContents();
 }
 
 void MainWindow::removeViewGroup(const QString &groupName)
@@ -274,15 +401,24 @@ void MainWindow::removeViewGroup(const QString &groupName)
     menu->clear();
     ui->menuConnections->removeAction(menu->menuAction());
     menu->deleteLater();
+
+    // core connection
+    Core::instance()->removeConnection(groupName);
+
+    // connections widget
+    {
+      QList<QTableWidgetItem*> items = ui->connectionsWidget->findItems(groupName,
+                                                                        Qt::MatchExactly);
+
+      Q_ASSERT(items.size() == 1);
+      int row = items.at(0)->row();
+      ui->connectionsWidget->removeRow(row);
+    }
   }
 }
 
 void MainWindow::init()
 {
-  Modem * modem = Core::instance()->modem();
-  connect(modem, SIGNAL(updatedPortStatus(bool)),
-          this, SLOT(updatePortStatus(bool)));
-
   restore();
 }
 
@@ -294,32 +430,6 @@ void MainWindow::tini()
   foreach(const QString &group, groups)
   {
     removeViewGroup(group);
-  }
-}
-
-void MainWindow::updateActionTriggered()
-{
-  ContainerHash::const_iterator iter = m_boxes.constBegin();
-  ContainerHash::const_iterator iterEnd = m_boxes.constEnd();
-
-  while(iter != iterEnd)
-  {
-    IView * view = iter.value().view;
-    QEvent * event = new QEvent(ModemEventType);
-
-    QCoreApplication::postEvent(view->widget(), event);
-
-    ++iter;
-  }
-}
-
-void MainWindow::updatePortStatus(bool opened)
-{
-  ui->actionUpdate->setEnabled(opened);
-
-  if (opened)
-  {
-    updateActionTriggered();
   }
 }
 
@@ -419,6 +529,19 @@ void MainWindow::onRemoveGroupAction()
     removeViewGroup(groupName);
     Settings set;
     set.remove(QString(SET_GROUP_PREFIX) + groupName);
+  }
+}
+
+void MainWindow::onConnectionEvent(const QString& connectionId,
+                                   Core::ConnectionEvent event,
+                                   const QVariant& data)
+{
+  QList<Box> boxes = m_boxes.values(connectionId);
+  Q_ASSERT(boxes.size());
+
+  foreach (const Box &box, boxes)
+  {
+    box.view->processConnectionEvent(event, data);
   }
 }
 

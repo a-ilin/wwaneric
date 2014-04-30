@@ -5,113 +5,157 @@
 
 #include <QEvent>
 #include <QMap>
+#include <QReadWriteLock>
 #include <QStringList>
 
 QStringList parseAnswerLine(const QString &line, const QString &command);
 
-class ConversationHandler;
 class Modem;
 
-class UnexpectedDataHandler
-{
-public:
-
-  virtual bool processUnexpectedData(const QByteArray& data) = 0;
-};
-
+// data that passed to conversation handler
 struct RequestArgs
 {
   virtual ~RequestArgs() {}
 };
-
-struct ModemRequest
+// data that passed from conversation handler
+struct AnswerData
 {
-  ModemRequest(int btype, int type, RequestArgs* args = NULL, int _retryCount = 1) :
-    requestType(type),
-    requestArgs(args),
-    requestStage(0),
-    retryCount(_retryCount),
-    baseType(btype)
-  {}
+  virtual ~AnswerData() {}
+};
 
-  ~ModemRequest()
-  {
-    if (requestArgs)
-    {
-      delete requestArgs;
-    }
-  }
+class ModemReply
+{
+public:
+  ModemReply();
+  ~ModemReply();
 
-  // type
-  int requestType;
-  // arguments
-  RequestArgs *requestArgs;
-  // stage
-  int requestStage;
-  // retry count in case of error, if 0 request will not be processed
-  int retryCount;
+  QString handlerName() const;
+  int type() const;
+  bool status() const;
+  AnswerData* data() const;
 
 private:
-  // base type offset for conversation handler
-  int baseType;
+
+  // hadler name
+  QString m_handlerName;
+  // inner reply handler type, usually equals to request type,
+  // but may differs in case of processing unexpected data
+  int m_type;
+  // success (true) or failure(false)
+  bool m_status;
+  // reply data
+  AnswerData * m_data;
 
   friend class Modem;
 };
 
-class ConversationHandler : public QObject
+Q_DECLARE_METATYPE(ModemReply)
+Q_DECLARE_METATYPE(ModemReply*)
+
+class ModemRequest
 {
 public:
-  ConversationHandler() :
-    QObject(NULL),
-    m_baseRequestType(0),
-    m_modem(NULL)
-  {}
+
+  ~ModemRequest();
+
+  enum Status
+  {
+    SuccessCompleted,
+    SuccessNeedMoreData,
+    Failure
+  };
+
+  int type() const;
+  RequestArgs* args() const;
+
+  int stage() const;
+  void setStage(int stage);
+
+  Modem* modem() const;
+
+private:
+  // inner request handler type
+  int m_type;
+  // arguments to handler
+  RequestArgs *m_args;
+  // stage
+  int m_stage;
+  // retry count in case of error, if 0 request will not be processed
+  int m_retry;
+  // base type offset for conversation handler
+  int m_baseOffset;
+  // modem
+  Modem * m_modem;
+
+  friend class Modem;
+};
+
+Q_DECLARE_METATYPE(ModemRequest)
+Q_DECLARE_METATYPE(ModemRequest*)
+
+
+class ConversationHandler
+{
+public:
+
+  ConversationHandler() {}
+  virtual ~ConversationHandler() {}
 
   // processes conversation (answer) for specified request
+  // Args:
+  // request [in, out] - current request in queue (can be modified in this method)
+  // c [in] - modem answer
+  // status [out] - set to corresponding status after request processing
+  // answerData [out] - pointer that must be initialized by answer data or set to NULL
+  virtual void processConversation(ModemRequest *request,
+                                   const Conversation &c,
+                                   ModemRequest::Status &status,
+                                   AnswerData* &answerData) const
+  {
+    Q_UNUSED(request);
+    Q_UNUSED(c);
+    Q_UNUSED(answerData);
+    status = ModemRequest::Failure;
+  }
+
+  // processes unexpected data from modem
   // if request processed successful should return true, otherwise false
   // Args:
-  // request - current request in queue (can be modified in this method)
-  // c - modem answer
-  // requestFinished - if request has no more stages should set it to true, otherwise to false
-  virtual bool processConversation(ModemRequest *request, const Conversation &c, bool &requestFinished) = 0;
+  // data [in] - data received by modem
+  // replyType [out] - should set to reply type if can recognize the data
+  // answerData [out] - pointer that must be initialized by answer data or set to NULL
+  virtual bool processUnexpectedData(const QByteArray& data,
+                                     int &replyType,
+                                     AnswerData* &answerData) const
+  {
+    Q_UNUSED(data);
+    Q_UNUSED(replyType);
+    Q_UNUSED(answerData);
+    return false;
+  }
 
   // returns the data that should be sent to port for specified request
-  virtual QByteArray requestData(const ModemRequest *request) const = 0;
+  virtual QByteArray requestData(const ModemRequest *request) const
+  {
+    Q_UNUSED(request);
+    return QByteArray();
+  }
 
   // returns the number of request types that can be processed by this handler
-  virtual int requestTypesCount() const = 0;
+  virtual int requestTypesCount() const
+  {
+    return 0;
+  }
 
   // returns the name for this handler (for internal purposes)
   virtual QString name() const = 0;
 
-  ModemRequest* createEmptyRequest(int type, RequestArgs * args = NULL) const
+  // returns the request args for specified request type
+  virtual RequestArgs* requestArgs(int type) const
   {
-    ModemRequest* r = new ModemRequest(m_baseRequestType, type);
-    r->requestArgs = args ? args : requestArgs();
-    r->requestStage = 0;
-    return r;
+    Q_UNUSED(type);
+    return NULL;
   }
-
-  Modem* modem() const
-  {
-    return m_modem;
-  }
-
-protected:
-  // returns the request args for this conversation handler
-  virtual RequestArgs *requestArgs() const
-  {
-    return new RequestArgs();
-  }
-
-private:
-
-  // Base request type offset for this handler. Set when handler registration occures.
-  int m_baseRequestType;
-
-  Modem * m_modem;
-
-  friend class Modem;
 };
 
 
@@ -132,11 +176,17 @@ public:
   void registerConversationHandler(ConversationHandler * handler);
   void unregisterConversationHandler(ConversationHandler * handler);
 
-  void registerUnexpectedDataHandler(UnexpectedDataHandler * handler);
-  void unregisterUnexpectedDataHandler(UnexpectedDataHandler * handler);
+  // creates modem request with specified type to passed handler name
+  // and specified retry count on errors
+  ModemRequest * createRequest(const QString &handlerName, int type, int retries);
 
 public slots:
+  // appends request to modem queue,
+  // after processing modem will delete the ModemRequest object
   void appendRequest(ModemRequest *request);
+
+signals:
+  void replyReceived(ModemReply * reply);
 
 protected:
   bool processConversation(const Conversation & c);
@@ -150,17 +200,19 @@ protected slots:
 private:
   QLinkedList<ModemRequest*> m_requests;
 
-  // key is baseRequestOffset
+  // baseOffset ; handler
   QMap<int, ConversationHandler*> m_conversationHandlers;
-  QList<UnexpectedDataHandler*> m_unexpectedDataHandlers;
+  // handler name ; baseOffset
+  QMap<QString, int> m_conversationHandlersNames;
 
   // is modem initialization sequence finished
   bool m_modemInited;
-  // handlers that processes modem initialization
+  // handler that processes modem initialization
   InitConversationHandler * m_initHandler;
   // init timeout timer
   QTimer * m_initTimer;
 
+  mutable QReadWriteLock m_rwlock;
 };
 
 #endif // MODEM_H

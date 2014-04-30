@@ -135,7 +135,7 @@ QStringList parseAnswerLine(const QString &line, const QString &command)
       if ((preResult.size() > index + 1) &&
           (preResult.at(index + 1).wasQuoted))
       {
-        if (str.at(str.length() - 1) != ',')
+        if ((!str.size()) || (str.at(str.size() - 1) != ','))
         {
           return QStringList();
         }
@@ -143,6 +143,20 @@ QStringList parseAnswerLine(const QString &line, const QString &command)
         {
           // remove last comma
           str.resize(str.size() - 1);
+        }
+      }
+
+      // check that if previous was quoted then current must starts with comma
+      if ((index > 0) && (preResult.at(index - 1).wasQuoted))
+      {
+        if ((!str.size()) || (str.at(0) != ','))
+        {
+          return QStringList();
+        }
+        else
+        {
+          // remove first comma
+          str.remove(0, 1);
         }
       }
 
@@ -155,6 +169,10 @@ QStringList parseAnswerLine(const QString &line, const QString &command)
 
   return result;
 }
+
+
+
+
 
 Modem::Modem() :
   PortController(),
@@ -173,98 +191,90 @@ Modem::~Modem()
 {
   unregisterConversationHandler(m_initHandler);
   delete m_initHandler;
-
-  if (m_conversationHandlers.size() > 0)
-  {
-    Q_LOGEX(LOG_VERBOSE_CRITICAL, "There is a conversation handler still registered!");
-  }
-
-  if (m_unexpectedDataHandlers.size() > 0)
-  {
-    Q_LOGEX(LOG_VERBOSE_CRITICAL, "There is an unexpected data handler still registered!");
-  }
 }
 
 void Modem::registerConversationHandler(ConversationHandler *handler)
 {
-  if (!handler)
+  Q_ASSERT(handler);
+
+  QWriteLocker locker(&m_rwlock);
+
+  if (m_conversationHandlersNames.contains(handler->name()))
   {
-    Q_LOGEX(LOG_VERBOSE_CRITICAL, "Null pointer passed!");
+    QString err("Handler with name \"%1\" is already registered!");
+    Q_LOGEX(LOG_VERBOSE_CRITICAL, err.arg(handler->name()));
     return;
   }
 
-  if (handler->m_baseRequestType || handler->m_modem)
-  {
-    Q_LOGEX(LOG_VERBOSE_CRITICAL, "Passed handler already was in use!");
-    return;
-  }
-
-  // the Map is sorted
+  // calculate handler base offset
   int maxRequestType = 0;
   if (m_conversationHandlers.size() > 0)
   {
+    // last handler will have the max base offset (QMap is sorted by key)
     const ConversationHandler * lastHandler = m_conversationHandlers.last();
-    maxRequestType = lastHandler->m_baseRequestType + lastHandler->requestTypesCount();
+    int lastKey = m_conversationHandlers.lastKey();
+    maxRequestType = lastKey + lastHandler->requestTypesCount();
   }
 
-  handler->m_modem = this;
-  handler->m_baseRequestType = maxRequestType;
   m_conversationHandlers.insert(maxRequestType, handler);
+  m_conversationHandlersNames.insert(handler->name(), maxRequestType);
 }
 
 void Modem::unregisterConversationHandler(ConversationHandler *handler)
 {
-  if (!handler)
+  Q_ASSERT(handler);
+
+  QWriteLocker locker(&m_rwlock);
+
+  if (!m_conversationHandlersNames.contains(handler->name()))
   {
-    Q_LOGEX(LOG_VERBOSE_CRITICAL, "Null pointer passed!");
+    QString err("Handler with name \"%1\" is not registered!");
+    Q_LOGEX(LOG_VERBOSE_CRITICAL, err.arg(handler->name()));
     return;
   }
 
-  ConversationHandler *handlerFound = m_conversationHandlers.value(handler->m_baseRequestType);
-  if (handlerFound == handler)
-  {
-    m_conversationHandlers.remove(handler->m_baseRequestType);
-    handler->m_baseRequestType = 0;
-    handler->m_modem = NULL;
-  }
-  else
-  {
-    Q_LOGEX(LOG_VERBOSE_CRITICAL, "Unregistered handler passed!");
-  }
+  int baseOffset = m_conversationHandlersNames.value(handler->name(), -1);
+  Q_ASSERT(baseOffset != -1);
+
+  Q_ASSERT(m_conversationHandlers.contains(baseOffset));
+  m_conversationHandlers.remove(baseOffset);
+
+  m_conversationHandlersNames.remove(handler->name());
 }
 
-void Modem::registerUnexpectedDataHandler(UnexpectedDataHandler* handler)
+ModemRequest* Modem::createRequest(const QString& handlerName, int type, int retries)
 {
-  if (!handler)
+  QReadLocker locker(&m_rwlock);
+
+  int baseOffset = m_conversationHandlersNames.value(handlerName, -1);
+  Q_ASSERT(baseOffset != -1);
+
+  ConversationHandler * handler = m_conversationHandlers.value(baseOffset);
+  Q_ASSERT(handler);
+
+
+  ModemRequest * r = NULL;
+  if (handler)
   {
-    Q_LOGEX(LOG_VERBOSE_CRITICAL, "Null pointer passed!");
-    return;
+    RequestArgs * args = handler->requestArgs(type);
+
+    r = new ModemRequest();
+    r->m_baseOffset = baseOffset;
+    r->m_type = type;
+    r->m_args = args;
+    r->m_retry = retries;
+    r->m_stage = 0;
+    r->m_modem = this;
+
   }
 
-  if (!m_unexpectedDataHandlers.contains(handler))
-  {
-    m_unexpectedDataHandlers.append(handler);
-  }
-}
-
-void Modem::unregisterUnexpectedDataHandler(UnexpectedDataHandler* handler)
-{
-  if (!handler)
-  {
-    Q_LOGEX(LOG_VERBOSE_CRITICAL, "Null pointer passed!");
-    return;
-  }
-
-  int removed = m_unexpectedDataHandlers.removeAll(handler);
-
-  if(!removed)
-  {
-    Q_LOGEX(LOG_VERBOSE_CRITICAL, "Handler was not registered!");
-  }
+  return r;
 }
 
 void Modem::appendRequest(ModemRequest *request)
 {
+  // this call is thread safe when called via queued Qt meta call
+
   m_requests.append(request);
   sendRequest();
 }
@@ -278,16 +288,16 @@ bool Modem::processConversation(const Conversation &c)
     return true;
   }
 
-  // conversation successfully processed
-  bool success = false;
-  // conversation processed and corresponding request should be removed
-  bool requestProcessed = false;
+  AnswerData * data = NULL;
+  ModemRequest::Status status;
+  ConversationHandler * handler = NULL;
+
+  ModemRequest * request = m_requests.first();
 
   if (requestData() == c.request)
   {
-    ModemRequest *request = m_requests.first();
-    int requestBaseTypeOffset = request->baseType;
-    ConversationHandler * handler = m_conversationHandlers.value(requestBaseTypeOffset);
+    QReadLocker locker(&m_rwlock);
+    handler = m_conversationHandlers.value(request->m_baseOffset);
 
     if (handler)
     {
@@ -297,19 +307,19 @@ bool Modem::processConversation(const Conversation &c)
       }
       else if (m_modemInited && (handler == m_initHandler))
       {
-        Q_LOGEX(LOG_VERBOSE_CRITICAL, "Modem is already initialized when initizlization answer received!");
+        Q_LOGEX(LOG_VERBOSE_CRITICAL, "Modem is already initialized when initialization answer received!");
       }
 
-      success = handler->processConversation(request, c, requestProcessed);
+      handler->processConversation(request, c, status, data);
 
-      if (success && requestProcessed && (handler == m_initHandler))
+      if ((status == ModemRequest::SuccessCompleted) && (handler == m_initHandler))
       {
         m_initTimer->stop();
         m_modemInited = true;
         modemDetected(true);
       }
 
-      if(!success)
+      if(status == ModemRequest::Failure)
       {
         if (handler == m_initHandler)
         {
@@ -333,18 +343,9 @@ bool Modem::processConversation(const Conversation &c)
           Q_LOGEX(LOG_VERBOSE_ERROR, str);
         }
 
-        --request->retryCount;
-        Q_ASSERT(request->retryCount >= 0);
-
-        // remove request with ended retries
-        if (!request->retryCount)
-        {
-          requestProcessed = true;
-          success = true;
-          Q_LOGEX(LOG_VERBOSE_NOTIFICATION, "Request retry count is ended. Request removed from queue.");
-        }
+        --request->m_retry;
+        Q_ASSERT(request->m_retry >= 0);
       }
-
     }
     else
     {
@@ -361,24 +362,60 @@ bool Modem::processConversation(const Conversation &c)
     Q_LOGEX(LOG_VERBOSE_ERROR, str);
   }
 
-  if (requestProcessed)
+  // remove request with ended retries
+  if ((!request->m_retry) || (status == ModemRequest::SuccessCompleted))
   {
+    if (!request->m_retry)
+    {
+      Q_LOGEX(LOG_VERBOSE_NOTIFICATION, "Request retry count is ended. Request removed from queue.");
+    }
+
+    Q_ASSERT(handler);
+
+    ModemReply * reply = new ModemReply();
+    reply->m_handlerName = handler->name();
+    reply->m_type = request->m_type;
+    reply->m_status = status == ModemRequest::SuccessCompleted;
+    reply->m_data = data;
+
     delete m_requests.takeFirst();
+
+    emit replyReceived(reply);
   }
 
-  return success;
+  return true;
 }
 
 bool Modem::processUnexpectedData(const QByteArray& data)
 {
+  QReadLocker locker(&m_rwlock);
+
   bool result = false;
 
-  for(int i=0; (i< m_unexpectedDataHandlers.size()) && (!result); ++i)
+  int replyType;
+  AnswerData * answer = NULL;
+  ConversationHandler * handler = NULL;
+
+  QMap<int, ConversationHandler*>::const_iterator iter = m_conversationHandlers.constBegin();
+
+  while((iter != m_conversationHandlers.constEnd()) && (!result))
   {
-    result = m_unexpectedDataHandlers.at(i)->processUnexpectedData(data);
+    result = iter.value()->processUnexpectedData(data, replyType, answer);
+
+    ++iter;
   }
 
-  if (!result)
+  if (result)
+  {
+    ModemReply * reply = new ModemReply();
+    reply->m_handlerName = handler->name();
+    reply->m_type = replyType;
+    reply->m_status = true;
+    reply->m_data = answer;
+
+    emit replyReceived(reply);
+  }
+  else
   {
     QString str = QString("Unexpected data was not processed: %1").arg(QString(data));
     Q_LOGEX(LOG_VERBOSE_WARNING, str);
@@ -389,12 +426,13 @@ bool Modem::processUnexpectedData(const QByteArray& data)
 
 QByteArray Modem::requestData() const
 {
+  QReadLocker locker(&m_rwlock);
+
   QByteArray data;
 
   foreach(const ModemRequest *request, m_requests)
   {
-    int requestBaseTypeOffset = request->baseType;
-    const ConversationHandler * handler = m_conversationHandlers.value(requestBaseTypeOffset);
+    const ConversationHandler * handler = m_conversationHandlers.value(request->m_baseOffset);
 
     if (handler)
     {
@@ -402,16 +440,16 @@ QByteArray Modem::requestData() const
       if (!data.size())
       {
         QString str = QString("Handler returned empty data for request. Base type: %1, type: %2")
-                      .arg(requestBaseTypeOffset)
-                      .arg(request->requestType);
+                      .arg(request->m_baseOffset)
+                      .arg(request->m_type);
         Q_LOGEX(LOG_VERBOSE_CRITICAL, str);
       }
     }
     else
     {
       QString err = QString("Handler for this type of request was unregistered! Base type: %1, type: %2")
-                    .arg(requestBaseTypeOffset)
-                    .arg(request->requestType);
+                    .arg(request->m_baseOffset)
+                    .arg(request->m_type);
       Q_LOGEX(LOG_VERBOSE_CRITICAL, err);
     }
 
@@ -433,7 +471,9 @@ void Modem::modemDetected(bool status)
   }
   else
   {
-    m_initHandler->initModem();
+    ModemRequest * initRequest = createRequest(m_initHandler->name(), INIT_REQUEST_INIT, 1);
+    appendRequest(initRequest);
+
     m_initTimer->start();
   }
 }
@@ -445,4 +485,79 @@ void Modem::onInitTimeout()
     closePort();
   }
 }
+
+
+
+ModemReply::ModemReply() :
+  m_data(NULL)
+{
+}
+
+ModemReply::~ModemReply()
+{
+  if (m_data)
+  {
+    delete m_data;
+  }
+}
+
+AnswerData* ModemReply::data() const
+{
+  return m_data;
+}
+
+QString ModemReply::handlerName() const
+{
+  return m_handlerName;
+}
+
+int ModemReply::type() const
+{
+  return m_type;
+}
+
+bool ModemReply::status() const
+{
+  return m_status;
+}
+
+
+
+
+ModemRequest::~ModemRequest()
+{
+  if (m_args)
+  {
+    delete m_args;
+  }
+}
+
+int ModemRequest::type() const
+{
+  return m_type;
+}
+
+RequestArgs*ModemRequest::args() const
+{
+  return m_args;
+}
+
+int ModemRequest::stage() const
+{
+  return m_stage;
+}
+
+void ModemRequest::setStage(int stage)
+{
+  m_stage = stage;
+}
+
+Modem*ModemRequest::modem() const
+{
+  return m_modem;
+}
+
+
+
+
 

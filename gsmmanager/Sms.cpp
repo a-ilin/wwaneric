@@ -7,6 +7,19 @@
 #include <QSqlDatabase>
 #include <QSqlError>
 
+
+bool checkSmsStorage(int storage)
+{
+  switch (storage)
+  {
+  case SMS_STORAGE_PHONE:
+  case SMS_STORAGE_SIM:
+    return true;
+  default:
+    return false;
+  }
+}
+
 QString smsStorageStr(SMS_STORAGE storage)
 {
   if (storage == SMS_STORAGE_PHONE)
@@ -44,10 +57,10 @@ SmsMeta::SmsMeta() :
 
 }
 
-SmsMeta::SmsMeta(SMS_STORAGE storage, SMS_STATUS status, int index) :
+SmsMeta::SmsMeta(SMS_STORAGE storage, SMS_STATUS status, const QList<int>& indexes) :
   m_valid(false),
   m_storage(storage),
-  m_index(index),
+  m_indexes(indexes),
   m_status(status)
 {
 }
@@ -58,7 +71,7 @@ Sms::Sms() :
 }
 
 Sms::Sms(SMS_STORAGE storage, SMS_STATUS status, int index, const QByteArray &rawData) :
-  SmsMeta(storage, status, index),
+  SmsMeta(storage, status, QList<int>() << index),
   m_rawData(rawData)
 {
   const char * pduString = rawData.constData();
@@ -262,6 +275,8 @@ Sms SmsDatabaseEntity::createFromSelect(const QList<QVariant> &values) const
 
 QSqlQuery SmsDatabaseEntity::queryInsert(Database *db, const Sms &value) const
 {
+  Q_ASSERT(value.indexes().size() == 1);
+
   QString resultString =
       "INSERT OR REPLACE "
       "INTO sms (i_storage, i_index, i_status, a_raw) "
@@ -271,7 +286,7 @@ QSqlQuery SmsDatabaseEntity::queryInsert(Database *db, const Sms &value) const
 
   query.prepare(resultString);
   query.bindValue(":i_storage", (int)value.storage());
-  query.bindValue(":i_index", value.index());
+  query.bindValue(":i_index", value.indexes().first());
   query.bindValue(":i_status", (int)value.status());
   query.bindValue(":a_raw", QString(value.rawData()));
 
@@ -287,5 +302,4 @@ QSqlQuery SmsDatabaseEntity::queryDelet(Database *db, const DatabaseKey &key) co
 {
   return QSqlQuery();
 }
-
 

@@ -41,7 +41,7 @@ QString hexString(const QList<QByteArray> & listData);
   type name; \
   { \
     bool ok = false; \
-    name = variant.method(&ok); \
+    name = (type)variant.method(&ok); \
     if (!ok) \
     { \
       bad_command; \

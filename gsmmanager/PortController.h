@@ -55,6 +55,8 @@ struct PortOptions
   bool stopBitsDefault;
 };
 
+Q_DECLARE_METATYPE(PortOptions)
+
 class PortController : public QObject
 {
   Q_OBJECT
@@ -70,8 +72,8 @@ public slots:
    * Connection information
    *
   */
-  void setPortName(const QString &portName);
-  void setPortOptions(const PortOptions &options);
+  void setPortName(const QString portName);
+  void setPortOptions(const PortOptions options);
   void openPort();
   void closePort();
 
@@ -82,7 +84,7 @@ signals:
   */
   void updatedPortStatus(bool opened);
   void updatedPortError(QSerialPort::SerialPortError errorCode);
-  void updatedPortError(const QString& errorString);
+  void updatedPortError(const QString errorString);
 
 protected:
   // return true if conversation was recognized and successfully processed

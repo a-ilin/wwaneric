@@ -5,42 +5,42 @@
 
 #define LAST_INIT_STAGE 0
 
-bool InitConversationHandler::processConversation(ModemRequest *request, const Conversation &c, bool &requestFinished)
-{
-  const int &requestType = request->requestType;
-  //const RequestArgs &requestArgs = request->requestArgs;
-  int &requestStage = request->requestStage;
 
-  bool success = false;
+void InitConversationHandler::processConversation(ModemRequest *request,
+                                                  const Conversation &c,
+                                                  ModemRequest::Status& status,
+                                                  AnswerData*& answerData) const
+{
+  Q_UNUSED(answerData);
+
+  const int requestType = request->type();
+  //const RequestArgs &requestArgs = request->requestArgs;
+
+  status = ModemRequest::Failure;
 
   if (c.status == Conversation::OK)
   {
     if (requestType == INIT_REQUEST_INIT)
     {
       // set preferred storage
-      if (requestStage < LAST_INIT_STAGE)
+      if (request->stage() < LAST_INIT_STAGE)
       {
-        ++requestStage;
-        success = true;
-        requestFinished = false;
+        request->setStage(request->stage() + 1);
+        status = ModemRequest::SuccessNeedMoreData;
       }
       else
       {
-        success = true;
-        requestFinished = true;
-        emit modemInited();
+        status = ModemRequest::SuccessCompleted;
       }
     }
   }
-
-  return success;
 }
 
 QByteArray InitConversationHandler::requestData(const ModemRequest *request) const
 {
-  const int &requestType = request->requestType;
+  const int requestType = request->type();
   //const RequestArgs &requestArgs = request->requestArgs;
-  const int &requestStage = request->requestStage;
+  const int requestStage = request->stage();
 
   QByteArray data;
 
@@ -65,7 +65,3 @@ QString InitConversationHandler::name() const
   return QString(INIT_HANDLER_NAME);
 }
 
-void InitConversationHandler::initModem()
-{
-  modem()->appendRequest(createEmptyRequest(INIT_REQUEST_INIT));
-}

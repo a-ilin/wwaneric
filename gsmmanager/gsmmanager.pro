@@ -11,6 +11,7 @@ DESTDIR = ..
 #else:unix: LIBS += -L$$OUT_PWD/../pdu-bin/release/ -lpdu
 
 #LIBS += -L$$OUT_PWD/../pdu-bin/release/ -lpdu
+#LIBS += -L$$DESTDIR -L$$OUT_PWD -lpdu
 LIBS += -L$$DESTDIR -lpdu
 
 #INCLUDEPATH += $$PWD/../pdu-bin/include
@@ -38,10 +39,10 @@ SOURCES += \
     Database.cpp \
     Sms.cpp \
     Settings.cpp \
-    views/SmsView.cpp \
-    views/SettingsView.cpp \
-    views/ModemStatusView.cpp \
-    views/UssdView.cpp \
+    SmsView.cpp \
+    SettingsView.cpp \
+    ModemStatusView.cpp \
+    UssdView.cpp \
     Ussd.cpp \
     common.cpp \
     PortController.cpp \
@@ -61,10 +62,10 @@ HEADERS  += \
     Database.h \
     Sms.h \
     Settings.h \
-    views/SmsView.h \
-    views/SettingsView.h \
-    views/ModemStatusView.h \
-    views/UssdView.h \
+    SmsView.h \
+    SettingsView.h \
+    ModemStatusView.h \
+    UssdView.h \
     Ussd.h \
     PortController.h \
     ModemSms.h \
@@ -75,10 +76,10 @@ HEADERS  += \
 
 FORMS    += \
     MainWindow.ui \
-    views/SmsView.ui \
-    views/SettingsView.ui \
-    views/ModemStatusView.ui \
-    views/UssdView.ui \
+    SmsView.ui \
+    SettingsView.ui \
+    ModemStatusView.ui \
+    UssdView.ui \
     AppSettingsDialog.ui
 
 RESOURCES += \
@@ -88,6 +89,14 @@ win32:RC_FILE = gsmmanager.rc
 
 OTHER_FILES += \
     gsmmanager.rc
+
+
+# icons
+copyicons.commands = $(COPY_DIR) $$PWD/icons $$DESTDIR
+first.depends = $(first) copyicons
+export(first.depends)
+export(copyicons.commands)
+QMAKE_EXTRA_TARGETS += first copyicons
 
 
 # Debug windows

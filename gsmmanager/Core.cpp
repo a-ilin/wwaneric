@@ -10,6 +10,15 @@
 
 #include <QApplication>
 #include <QDir>
+#include <QThread>
+
+#define MODEM_ID_PROPERTY "modemId"
+
+#define CHECK_METACALL_RESULT(result) \
+  if (!result) \
+  { \
+    Q_LOGEX(LOG_VERBOSE_CRITICAL, "Meta call failed!"); \
+  }
 
 Core* Core::m_instance = NULL;
 
@@ -43,6 +52,14 @@ bool Core::init()
       LogFlush();
     }
 
+    // QMetaType data types
+    qRegisterMetaType<Modem**>("Modem**");
+    qRegisterMetaType<PortOptions>("PortOptions");
+    qRegisterMetaType<ModemRequest>("ModemRequest");
+    qRegisterMetaType<ModemRequest*>("ModemRequest*");
+    qRegisterMetaType<ModemReply>("ModemReply");
+    qRegisterMetaType<ModemReply*>("ModemReply*");
+
     // database
     {
       DatabaseManager::init();
@@ -62,34 +79,16 @@ bool Core::init()
       }
     }
 
-    // modems
-    {
-      // TODO: support multiple modems
-      Modem * m = new Modem();
-      m_modems.insert(QString(), QSharedPointer<Modem>(m));
-    }
-
     // conversation handlers
-    foreach(const QSharedPointer<Modem> &modem, m_modems)
-    {
-      ConversationHandlersHash handlersHash;
+    m_conversationHandlers.append(new SmsConversationHandler());
+    m_conversationHandlers.append(new StatusConversationHandler());
+    m_conversationHandlers.append(new UssdConversationHandler());
 
-      SmsConversationHandler * smsHandler = new SmsConversationHandler();
-      modem->registerConversationHandler(smsHandler);
-      handlersHash.insert(smsHandler->name(), smsHandler);
-
-      StatusConversationHandler * statusHandler = new StatusConversationHandler();
-      modem->registerConversationHandler(statusHandler);
-      handlersHash.insert(statusHandler->name(), statusHandler);
-
-      UssdConversationHandler * ussdHandler = new UssdConversationHandler();
-      modem->registerConversationHandler(ussdHandler);
-      handlersHash.insert(ussdHandler->name(), ussdHandler);
-      modem->registerUnexpectedDataHandler(ussdHandler);
-      m_unexpectedDataHandlers.insert(modem.data(), ussdHandler);
-
-      m_conversationHandlers.insert(modem.data(), handlersHash);
-    }
+    // Modems thread
+    m_modemThread = new QThread();
+    m_modemThread->start();
+    m_modemThreadHelper = new ModemThreadHelper();
+    m_modemThreadHelper->moveToThread(m_modemThread);
 
     // MainWindow
     m_mainWindow = new MainWindow(NULL);
@@ -116,40 +115,22 @@ bool Core::tini()
       m_mainWindow = NULL;
     }
 
-    // conversation handlers
-    {
-      ConversationHandlersModemHash::iterator iter = m_conversationHandlers.begin();
-      while(iter != m_conversationHandlers.constEnd())
-      {
-        Modem * modem = iter.key();
-
-        ConversationHandlersHash::iterator iterHandlers = iter.value().begin();
-        while (iterHandlers != iter.value().constEnd())
-        {
-          ConversationHandler * cHandler = iterHandlers.value();
-          modem->unregisterConversationHandler(cHandler);
-          delete cHandler;
-          iterHandlers = iter.value().erase(iterHandlers);
-        }
-
-        iter = m_conversationHandlers.erase(iter);
-      }
-    }
-
-    // unexpected data handlers
-    {
-      UnexpectedDataHandlerModemHash::iterator iter = m_unexpectedDataHandlers.begin();
-      while(iter != m_unexpectedDataHandlers.constEnd())
-      {
-        Modem * modem = iter.key();
-        UnexpectedDataHandler * handler = iter.value();
-        modem->unregisterUnexpectedDataHandler(handler);
-        iter = m_unexpectedDataHandlers.erase(iter);
-      }
-    }
-
     // modems
-    m_modems.clear();
+    Q_ASSERT(m_modems.isEmpty());
+    QStringList modemNames = m_modems.keys();
+    foreach(const QString &name, modemNames)
+    {
+      removeConnection(name);
+    }
+
+    // modems thread
+    m_modemThread->quit();
+    m_modemThread->wait();
+    delete m_modemThreadHelper;
+    delete m_modemThread;
+
+    // conversation handlers
+    qDeleteAll(m_conversationHandlers);
 
     // database
     DatabaseManager::deinit();
@@ -172,34 +153,155 @@ bool Core::tini()
   return true;
 }
 
-Modem *Core::modem(const QString &id) const
+void Core::createConnection(const QString& id)
 {
-  Modem * m = m_modems.value(id).data();
+  Q_ASSERT(!m_modems.contains(id));
+
+  // acquire a modem from it's thread
+  Modem * m = NULL;
+  int result = QMetaObject::invokeMethod(m_modemThreadHelper, "createModem",
+                                         Qt::BlockingQueuedConnection,
+                                         Q_ARG(Modem**, &m),
+                                         Q_ARG(QString, id));
+  CHECK_METACALL_RESULT(result);
   Q_ASSERT(m);
-  return m;
+
+  m_modems.insert(id, m);
+
+  foreach(ConversationHandler* handler, m_conversationHandlers)
+  {
+    m->registerConversationHandler(handler);
+  }
+
+  connect(m, SIGNAL(updatedPortStatus(bool)),
+          SLOT(onConnectionStatusChanged(bool)));
+
+  connect(m, SIGNAL(updatedPortError(QString)),
+          SLOT(onConnectionErrorOccured(QString)));
+
+  connect(m, SIGNAL(replyReceived(ModemReply*)),
+          SLOT(onReplyReceived(ModemReply*)));
 }
+
+void Core::removeConnection(const QString& id)
+{
+  Modem * m = m_modems.value(id);
+  Q_ASSERT(m);
+  Q_ASSERT(m->property(MODEM_ID_PROPERTY).toString() == id);
+
+  if (m)
+  {
+    m_modems.remove(id);
+
+    // delete modem in it's thread
+    int result = QMetaObject::invokeMethod(m_modemThreadHelper, "deleteModem",
+                                           Qt::BlockingQueuedConnection,
+                                           Q_ARG(Modem**, &m));
+    CHECK_METACALL_RESULT(result);
+    Q_ASSERT(!m);
+  }
+}
+
+
 
 QString Core::appUserDirectory() const
 {
   return QApplication::applicationDirPath();
 }
 
-ConversationHandler* Core::conversationHandler(Modem *modem, const QString &name) const
+ModemRequest* Core::modemRequest(const QString& connectionId,
+                                 const QString& conversationHandlerName,
+                                 int requestType,
+                                 int requestRetries) const
 {
-  ConversationHandler * handler = NULL;
+  Modem * m = m_modems.value(connectionId);
+  Q_ASSERT(m);
+  Q_ASSERT(m->property(MODEM_ID_PROPERTY).toString() == connectionId);
 
-  if (m_conversationHandlers.contains(modem))
+  ModemRequest * request = NULL;
+
+  if (m)
   {
-    const ConversationHandlersHash &cHash = m_conversationHandlers[modem];
-    handler = cHash.value(name);
+    request = m->createRequest(conversationHandlerName, requestType, requestRetries);
+    Q_ASSERT(request);
   }
 
-  if (!handler)
-  {
-    Q_LOGEX(LOG_VERBOSE_CRITICAL, "No handlers for specified modem found!");
-  }
+  return request;
+}
 
-  return handler;
+void Core::onReplyReceived(ModemReply* reply)
+{
+  Modem * modem = static_cast<Modem*>(sender());
+  Q_ASSERT(modem);
+  QString id = modem->property(MODEM_ID_PROPERTY).toString();
+  // this is should be direct connection
+  emit connectionEvent(id, ConnectionEventCustom, QVariant::fromValue<ModemReply*>(reply));
+  delete reply;
+}
+
+void Core::onConnectionStatusChanged(bool status)
+{
+  Modem * modem = static_cast<Modem*>(sender());
+  Q_ASSERT(modem);
+  QString id = modem->property(MODEM_ID_PROPERTY).toString();
+
+  emit connectionEvent(id, ConnectionEventStatus, status);
+}
+
+void Core::onConnectionErrorOccured(const QString error)
+{
+  Modem * modem = static_cast<Modem*>(sender());
+  Q_ASSERT(modem);
+  QString id = modem->property(MODEM_ID_PROPERTY).toString();
+  emit connectionEvent(id, ConnectionEventError, error);
+}
+
+void Core::pushRequest(ModemRequest* request)
+{
+  int result = QMetaObject::invokeMethod(request->modem(), "appendRequest",
+                                         Qt::QueuedConnection,
+                                         Q_ARG(ModemRequest*, request));
+
+  CHECK_METACALL_RESULT(result);
+}
+
+void Core::openConnection(const QString& id, const QString& portName, const PortOptions& options)
+{
+  Modem * m = m_modems.value(id);
+  Q_ASSERT(m);
+  Q_ASSERT(m->property(MODEM_ID_PROPERTY).toString() == id);
+
+  if (m)
+  {
+    int result = 1;
+    result = QMetaObject::invokeMethod(m, "setPortOptions",
+                                       Qt::QueuedConnection,
+                                       Q_ARG(PortOptions, options));
+    CHECK_METACALL_RESULT(result);
+
+    result = QMetaObject::invokeMethod(m, "setPortName",
+                                       Qt::QueuedConnection,
+                                       Q_ARG(QString, portName));
+    CHECK_METACALL_RESULT(result);
+
+    result = QMetaObject::invokeMethod(m, "openPort",
+                                       Qt::QueuedConnection);
+    CHECK_METACALL_RESULT(result);
+  }
+}
+
+void Core::closeConnection(const QString& id)
+{
+  Modem * m = m_modems.value(id);
+  Q_ASSERT(m);
+  Q_ASSERT(m->property(MODEM_ID_PROPERTY).toString() == id);
+
+  if (m)
+  {
+    int result = QMetaObject::invokeMethod(m, "closePort",
+                                           Qt::QueuedConnection);
+    CHECK_METACALL_RESULT(result);
+  }
 }
 
 void Core::storeSettings()
@@ -210,4 +312,16 @@ void Core::storeSettings()
 void Core::restoreSettings()
 {
 
+}
+
+void ModemThreadHelper::createModem(Modem** modem, const QString& id)
+{
+  (*modem) = new Modem();
+  (*modem)->setProperty(MODEM_ID_PROPERTY, id);
+}
+
+void ModemThreadHelper::deleteModem(Modem** modem)
+{
+  (*modem)->deleteLater();
+  (*modem) = NULL;
 }

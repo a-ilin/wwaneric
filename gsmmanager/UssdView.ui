@@ -176,7 +176,7 @@ Double click a cell to send USSD.</string>
   <customwidget>
    <class>UssdTableWidget</class>
    <extends>QTableWidget</extends>
-   <header>views/UssdView.h</header>
+   <header>UssdView.h</header>
   </customwidget>
  </customwidgets>
  <tabstops>

@@ -13,19 +13,15 @@ enum INIT_REQUEST_TYPE
 
 class InitConversationHandler : public ConversationHandler
 {
-  Q_OBJECT
-
 public:
-  bool processConversation(ModemRequest *request, const Conversation &c, bool &requestFinished);
+  void processConversation(ModemRequest *request,
+                           const Conversation &c,
+                           ModemRequest::Status &status,
+                           AnswerData* &answerData) const;
+
   QByteArray requestData(const ModemRequest *request) const;
   int requestTypesCount() const;
   QString name() const;
-
-public slots:
-  void initModem();
-
-signals:
-  void modemInited();
 
 };
 
