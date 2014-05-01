@@ -143,6 +143,8 @@ private:
 
   // serial port options
   PortOptions m_options;
+
+  Q_DISABLE_COPY(PortController)
 };
 
 #endif // PORTCONTROLLER_H

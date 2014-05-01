@@ -173,8 +173,9 @@ void PortController::closePort()
 
   if (m_serialPort->isOpen())
   {
-    m_serialPort->close();
+    // TODO: Should device be cleared before close?
     m_serialPort->clear();
+    m_serialPort->close();
   }
 
   m_timerTimeout->stop();

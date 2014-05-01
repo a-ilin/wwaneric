@@ -30,12 +30,45 @@ enum SMS_STATUS
 
 bool checkSmsStatus(int status);
 
+
+struct Sms
+{
+  Sms();
+  Sms(SMS_STORAGE storage, int index, SMS_STATUS status, const QByteArray &rawData);
+
+  // is this sms valid
+  bool valid;
+
+  // storage type
+  SMS_STORAGE storage;
+  // index of SMS in storage. Indexes can be sparsed!
+  int index;
+  // SMS status
+  SMS_STATUS status;
+
+  // PDU decoded values
+  QString userText;
+  QDateTime dateTime;
+  QString sender;
+  QString smsc;
+
+  // if there was a PDU parsing error this will not be empty
+  QString parseError;
+
+  QString udhType;
+  QByteArray udhData;
+
+  // PDU raw data
+  QByteArray rawData;
+};
+
+//Q_DECLARE_METATYPE(Sms)
+
+
 class SmsMeta
 {
 public:
-  SmsMeta();
-  SmsMeta(SMS_STORAGE storage, SMS_STATUS status, const QList<int> &indexes);
-  virtual ~SmsMeta() {}
+  SmsMeta(const QList<Sms>& smsList);
 
   bool isValid() const { return m_valid; }
 
@@ -71,37 +104,14 @@ protected:
   QString m_sender;
   QString m_smsc;
 
+  // PDU container
+  QList<QByteArray> m_pduList;
+
 };
 
-Q_DECLARE_METATYPE(SmsMeta)
+//Q_DECLARE_METATYPE(SmsMeta)
 
-class Sms : public SmsMeta
-{
-public:
-  Sms();
-  Sms(SMS_STORAGE storage, SMS_STATUS status, int index, const QByteArray &rawData);
-  ~Sms() {}
 
-  QString parseError() const { return m_parseError; }
-
-  QString udhType() const { return m_udhType; }
-  QByteArray udhData() const {return m_udhData; }
-
-  QByteArray rawData() const {return m_rawData; }
-
-protected:
-
-  // if there was a PDU parsing error this will not be empty
-  QString m_parseError;
-
-  QString m_udhType;
-  QByteArray m_udhData;
-
-  // PDU raw data
-  QByteArray m_rawData;
-};
-
-Q_DECLARE_METATYPE(Sms)
 
 
 class SmsDatabaseEntity : public IDatabaseEntity<Sms>

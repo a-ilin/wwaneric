@@ -37,6 +37,7 @@ SmsView::SmsView(const QString& connectionId, QWidget *parent) :
   m_proxyModel->setSourceModel(m_sourceModel);
 
   ui->smsView->setModel(m_proxyModel);
+
   ui->smsView->sortByColumn(ColumnDate, Qt::DescendingOrder);
 
   connect(ui->smsView->model(), SIGNAL(modelReset()), SLOT(changeViewActionStatus()));
@@ -82,14 +83,16 @@ SmsView::SmsView(const QString& connectionId, QWidget *parent) :
   // SMS view tool buttons actions
   {
     m_smsDelete = new QAction(QIcon("icons/sms_delete.png"), tr("Delete"), this);
-    m_smsDelete->setToolTip(tr("Delete selected SMS"));
+    m_smsDelete->setToolTip(tr("Delete message(s)"));
     connect(m_smsDelete, SIGNAL(triggered()), SLOT(onSmsDeleteAction()));
     ui->deleteBtn->setDefaultAction(m_smsDelete);
+    ui->smsView->addAction(m_smsDelete);
 
     m_smsReply = new QAction(QIcon("icons/sms_reply.png"), tr("Reply"), this);
-    m_smsReply->setToolTip(tr("Reply to selected SMS sender"));
+    m_smsReply->setToolTip(tr("Reply to message"));
     connect(m_smsReply, SIGNAL(triggered()), SLOT(onSmsReplyAction()));
     ui->replyBtn->setDefaultAction(m_smsReply);
+    ui->smsView->addAction(m_smsReply);
 
     changeViewActionStatus();
   }
@@ -222,7 +225,7 @@ void SmsView::tini()
 
 void SmsView::restore(Settings &set)
 {
-  Q_UNUSED(set);
+  ui->smsView->horizontalHeader()->restoreState(set.value("smsViewHeader").toByteArray());
 
   SmsDatabaseEntity smsDb;
   if (smsDb.init())
@@ -233,7 +236,7 @@ void SmsView::restore(Settings &set)
 
 void SmsView::store(Settings &set)
 {
-  Q_UNUSED(set);
+  set.setValue("smsViewHeader", ui->smsView->horizontalHeader()->saveState());
 }
 
 QString SmsView::name() const
@@ -285,7 +288,7 @@ void SmsView::onSmsDeleteAction()
   QModelIndexList selected = ui->smsView->selectionModel()->selectedRows();
   QModelIndex current = ui->smsView->selectionModel()->currentIndex();
 
-  QList<SmsMeta> forDeletion;
+  QList<QPair<SMS_STORAGE, QList<int> > > forDeletion;
 
   if (selected.size() > 1)
   {
@@ -295,9 +298,11 @@ void SmsView::onSmsDeleteAction()
     {
       const QModelIndex &index = selected.at(i);
 
-      QModelIndex statusIndex = index.sibling(index.row(), ColumnStatus);
-      Q_ASSERT(statusIndex.isValid());
-      forDeletion.append(statusIndex.data(Qt::UserRole).value<SmsMeta>());
+      QModelIndex storageIndex = index.sibling(index.row(), ColumnStorage);
+      Q_ASSERT(storageIndex.isValid());
+
+      forDeletion.append(qMakePair((SMS_STORAGE)storageIndex.data(Qt::UserRole).toInt(),
+                                   storageIndex.data(Qt::UserRole+1).value<QList<int> >()));
 
       QModelIndex sourceIndex = m_proxyModel->mapToSource(index);
       Q_ASSERT(sourceIndex.isValid());
@@ -306,9 +311,15 @@ void SmsView::onSmsDeleteAction()
   }
   else if (current.isValid())
   {
-    QModelIndex statusIndex = current.sibling(current.row(), ColumnStatus);
-    Q_ASSERT(statusIndex.isValid());
-    forDeletion.append(statusIndex.data(Qt::UserRole).value<SmsMeta>());
+    QModelIndex storageIndex = current.sibling(current.row(), ColumnStorage);
+    Q_ASSERT(storageIndex.isValid());
+
+    forDeletion.append(qMakePair((SMS_STORAGE)storageIndex.data(Qt::UserRole).toInt(),
+                                 storageIndex.data(Qt::UserRole+1).value<QList<int> >()));
+
+    QModelIndex sourceIndex = m_proxyModel->mapToSource(current);
+    Q_ASSERT(sourceIndex.isValid());
+    m_sourceModel->removeRow(sourceIndex.row());
   }
   else
   {
@@ -342,7 +353,7 @@ void SmsView::readSms(const QList<Sms>& smsList)
   QList<SmsMeta> smsMetaList;
   foreach(const Sms& sms, smsList)
   {
-    smsMetaList.append(SmsMeta(sms));
+    smsMetaList.append(SmsMeta(QList<Sms>() << sms));
   }
 
   // TODO: ???
@@ -408,15 +419,16 @@ void SmsView::readSms(const QList<Sms>& smsList)
           tr("Message contains %1 SMS(es)").arg(indexes.size());
     }
 
+    QStandardItem * itemStorage = new QStandardItem(storageIcon, QString());
+    itemStorage->setData(storage, Qt::UserRole);
+    itemStorage->setData(QVariant::fromValue<QList<int> >(smsMeta.indexes()), Qt::UserRole+1);
+    itemStorage->setToolTip(smsTooltip);
+    m_sourceModel->setItem(row, ColumnStorage, itemStorage);
+
     QStandardItem * itemStatus = new QStandardItem(statusIcon, QString());
     itemStatus->setData(status, Qt::UserRole);
     itemStatus->setToolTip(smsTooltip);
     m_sourceModel->setItem(row, ColumnStatus, itemStatus);
-
-    QStandardItem * itemStorage = new QStandardItem(storageIcon, QString());
-    itemStorage->setData(storage, Qt::UserRole);
-    itemStorage->setToolTip(smsTooltip);
-    m_sourceModel->setItem(row, ColumnStorage, itemStorage);
 
     QStandardItem * itemDate = new QStandardItem(smsMeta.dateTime().toString(Qt::RFC2822Date));
     itemDate->setToolTip(smsTooltip);
@@ -444,19 +456,19 @@ void SmsView::readSms(const QList<Sms>& smsList)
   ui->labelSmsSentCountValue->setText(QString::number(smsCountSent));
 }
 
-void SmsView::deleteSms(const QList<SmsMeta>& smsList)
+void SmsView::deleteSms(const QList<QPair<SMS_STORAGE,QList<int> > >& msgList)
 {
   Core * c = Core::instance();
 
-  foreach (const SmsMeta& smsMeta, smsList)
-  {
-    QList<int> metaIndexes = smsMeta.indexes();
+  typedef QPair<SMS_STORAGE,QList<int> > Msg;
 
-    foreach(int index, metaIndexes)
+  foreach (const Msg& msg, msgList)
+  {
+    foreach(int index, msg.second)
     {
       ModemRequest * request = c->modemRequest(connectionId(), SMS_HANDLER_NAME, SMS_REQUEST_DELETE, 1);
       SmsArgsDelete * args = static_cast<SmsArgsDelete*> (request->args());
-      args->smsStorage = smsMeta.storage();
+      args->smsStorage = msg.first;
       args->smsIndex = index;
       c->pushRequest(request);
     }

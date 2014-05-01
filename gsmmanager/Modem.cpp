@@ -6,8 +6,6 @@
 
 #include <QTimer>
 
-QEvent::Type ModemEventType = (QEvent::Type)QEvent::registerEventType();
-
 
 /* line should have format:
  * <command>: <data>[,<data>[,<data>[,...]]]

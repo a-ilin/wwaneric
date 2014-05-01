@@ -3,7 +3,6 @@
 
 #include "PortController.h"
 
-#include <QEvent>
 #include <QMap>
 #include <QReadWriteLock>
 #include <QStringList>
@@ -51,6 +50,7 @@ private:
 
 Q_DECLARE_METATYPE(ModemReply)
 Q_DECLARE_METATYPE(ModemReply*)
+Q_DECLARE_METATYPE(ModemReply**)
 
 class ModemRequest
 {
@@ -92,6 +92,7 @@ private:
 
 Q_DECLARE_METATYPE(ModemRequest)
 Q_DECLARE_METATYPE(ModemRequest*)
+Q_DECLARE_METATYPE(ModemRequest**)
 
 
 class ConversationHandler
@@ -159,9 +160,6 @@ public:
 };
 
 
-// an ID for QEvent object constructing
-extern QEvent::Type ModemEventType;
-
 class InitConversationHandler;
 class QTimer;
 
@@ -213,6 +211,11 @@ private:
   QTimer * m_initTimer;
 
   mutable QReadWriteLock m_rwlock;
+
+  Q_DISABLE_COPY(Modem)
 };
+
+Q_DECLARE_METATYPE(Modem*)
+Q_DECLARE_METATYPE(Modem**)
 
 #endif // MODEM_H

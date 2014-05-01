@@ -35,8 +35,6 @@ public:
     return "Status";
   }
 
-  bool event(QEvent * e);
-
   void processConnectionEvent(Core::ConnectionEvent event, const QVariant &data);
 
   enum Columns

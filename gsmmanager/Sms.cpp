@@ -51,64 +51,127 @@ bool checkSmsStatus(int status)
   }
 }
 
-SmsMeta::SmsMeta() :
-  m_valid(false)
-{
-
-}
-
-SmsMeta::SmsMeta(SMS_STORAGE storage, SMS_STATUS status, const QList<int>& indexes) :
-  m_valid(false),
-  m_storage(storage),
-  m_indexes(indexes),
-  m_status(status)
-{
-}
 
 Sms::Sms() :
-  SmsMeta()
+  valid(false)
 {
 }
 
-Sms::Sms(SMS_STORAGE storage, SMS_STATUS status, int index, const QByteArray &rawData) :
-  SmsMeta(storage, status, QList<int>() << index),
-  m_rawData(rawData)
+Sms::Sms(SMS_STORAGE storage, int index, SMS_STATUS status, const QByteArray &rawData) :
+  storage(storage),
+  index(index),
+  status(status),
+  rawData(rawData)
 {
   const char * pduString = rawData.constData();
   PDU pdu(pduString);
   if (pdu.parse())
   {
-    m_smsc = QString::fromLatin1(pdu.getSMSC());
-    m_sender = QString::fromLatin1(pdu.getNumber());
-    m_userText = QString::fromUtf8(pdu.getMessage());
+    smsc = QString::fromLatin1(pdu.getSMSC());
+    sender = QString::fromLatin1(pdu.getNumber());
+    userText = QString::fromUtf8(pdu.getMessage());
 
     QStringList msgDate = QString::fromLatin1(pdu.getDate()).split(QString("-"));
     QStringList msgTime = QString::fromLatin1(pdu.getTime()).split(QString(":"));
 
     if ( (msgDate.size() == 3) && (msgTime.size() == 3) )
     {
-      m_dateTime = QDateTime(QDate(msgDate.at(0).toInt(), msgDate.at(1).toInt(), msgDate.at(2).toInt()),
+      dateTime = QDateTime(QDate(msgDate.at(0).toInt(), msgDate.at(1).toInt(), msgDate.at(2).toInt()),
                                   QTime(msgTime.at(0).toInt(), msgTime.at(1).toInt(), msgTime.at(2).toInt()));
     }
 
     int udhDataLen = pdu.getUDHData()[0];
     if (udhDataLen)
     {
-      m_udhData.append(pdu.getUDHData()+1, udhDataLen);
+      udhData.append(pdu.getUDHData()+1, udhDataLen);
     }
 
-    m_udhType = QString::fromLatin1(pdu.getUDHType());
+    udhType = QString::fromLatin1(pdu.getUDHType());
 
     //   std::cout << "Message Sender Number Type: " << pdu.getNumberType() << std::endl;
     //   std::cout << "Message Length: " << pdu.getMessageLen() << std::endl;
 
-    m_valid = true;
+    valid = true;
   }
   else
   {
-    m_parseError = QString::fromLatin1(pdu.getError());
+    valid = false;
+    parseError = QString::fromLatin1(pdu.getError());
   }
 }
+
+
+SmsMeta::SmsMeta(const QList<Sms>& smsList)
+{
+  int id = 0;
+  m_valid = true;
+  foreach(const Sms& sms, smsList)
+  {
+    if (!id)
+    {
+      // this parameters should be the same for all SMS in the message
+      m_storage = sms.storage;
+      m_status = sms.status;
+      m_sender = sms.sender;
+      m_smsc = sms.smsc;
+
+      // copy datetime from the first SMS
+      m_dateTime = sms.dateTime;
+    }
+    else
+    {
+      if (m_storage != sms.storage)
+      {
+        m_valid = false;
+        Q_LOGEX(LOG_VERBOSE_ERROR, "Passed SMSes with different storage types!");
+      }
+
+      if (m_status != sms.status)
+      {
+        m_valid = false;
+        Q_LOGEX(LOG_VERBOSE_ERROR, "Passed SMSes with different status types!");
+      }
+
+      if (m_sender != sms.sender)
+      {
+        m_valid = false;
+        Q_LOGEX(LOG_VERBOSE_ERROR, "Passed SMSes with different senders!");
+      }
+
+      if (m_smsc != sms.smsc)
+      {
+        m_valid = false;
+        Q_LOGEX(LOG_VERBOSE_ERROR, "Passed SMSes with different SMSC!");
+      }
+    }
+
+    // dateTime can differs in different SMSes, we will use the last
+    if (sms.dateTime > m_dateTime)
+    {
+      m_dateTime = sms.dateTime;
+    }
+
+    // concat user message
+    m_userText += sms.userText;
+
+    // append SMS index
+    if(!m_indexes.contains(sms.index))
+    {
+      m_indexes.append(sms.index);
+    }
+    else
+    {
+      m_valid = false;
+      Q_LOGEX(LOG_VERBOSE_ERROR, "Passed SMSes with the same index!");
+    }
+
+    // append SMS PDU
+    m_pduList.append(sms.rawData);
+
+    ++id;
+  }
+}
+
 
 bool SmsDatabaseEntity::isDatabaseReady(Database *db) const
 {
@@ -256,11 +319,11 @@ Sms SmsDatabaseEntity::createFromSelect(const QList<QVariant> &values) const
       throw QString("Wrong status type!");
     }
 
-    Sms sms(smsStorage, smsStatus, index, rawData);
+    Sms sms(smsStorage, index, smsStatus, rawData);
 
-    if (!sms.isValid())
+    if (!sms.valid)
     {
-      throw sms.parseError();
+      throw sms.parseError;
     }
 
     return sms;
@@ -275,8 +338,6 @@ Sms SmsDatabaseEntity::createFromSelect(const QList<QVariant> &values) const
 
 QSqlQuery SmsDatabaseEntity::queryInsert(Database *db, const Sms &value) const
 {
-  Q_ASSERT(value.indexes().size() == 1);
-
   QString resultString =
       "INSERT OR REPLACE "
       "INTO sms (i_storage, i_index, i_status, a_raw) "
@@ -285,10 +346,10 @@ QSqlQuery SmsDatabaseEntity::queryInsert(Database *db, const Sms &value) const
   QSqlQuery query(db->qDatabase());
 
   query.prepare(resultString);
-  query.bindValue(":i_storage", (int)value.storage());
-  query.bindValue(":i_index", value.indexes().first());
-  query.bindValue(":i_status", (int)value.status());
-  query.bindValue(":a_raw", QString(value.rawData()));
+  query.bindValue(":i_storage", (int)value.storage);
+  query.bindValue(":i_index", value.index);
+  query.bindValue(":i_status", (int)value.status);
+  query.bindValue(":a_raw", QString(value.rawData));
 
   return query;
 }

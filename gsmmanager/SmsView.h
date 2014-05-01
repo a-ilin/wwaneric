@@ -41,8 +41,8 @@ public:
 
   enum Columns
   {
+    ColumnStorage,  // also contains message's SMS indexes in Qt::UserRole+1
     ColumnStatus,
-    ColumnStorage,
     ColumnDate,
     ColumnNumber,
     ColumnMessage,
@@ -54,7 +54,7 @@ public:
 protected:
   void changeEvent(QEvent *e);
   void readSms(const QList<Sms> &smsList);
-  void deleteSms(const QList<SmsMeta>& smsList);
+  void deleteSms(const QList<QPair<SMS_STORAGE, QList<int> > >& msgList);
 
 private slots:
   void smsStatusShowButtonToggle(bool checked);
@@ -91,6 +91,7 @@ protected:
    bool	filterAcceptsRow(int source_row, const QModelIndex& source_parent) const;
 
 private:
+   // show filters
    QMap<SMS_STATUS, bool> m_statusMap;
    QMap<SMS_STORAGE, bool> m_storageMap;
 };

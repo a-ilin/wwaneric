@@ -105,9 +105,9 @@ void SmsConversationHandler::processConversation(ModemRequest *request,
 
               QByteArray pdu = c.data.at(i+1);
 
-              Sms sms(smsArgs->smsStorage, (SMS_STATUS)msgStatus, msgIndex, pdu);
+              Sms sms(smsArgs->smsStorage, msgIndex, (SMS_STATUS)msgStatus, pdu);
 
-              if (sms.isValid())
+              if (sms.valid)
               {
                 smsList.append(sms);
               }

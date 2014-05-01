@@ -348,6 +348,9 @@
       <layout class="QGridLayout" name="gridLayout_3">
        <item row="1" column="1" colspan="6">
         <widget class="QTableView" name="smsView">
+         <property name="contextMenuPolicy">
+          <enum>Qt::ActionsContextMenu</enum>
+         </property>
          <property name="editTriggers">
           <set>QAbstractItemView::NoEditTriggers</set>
          </property>

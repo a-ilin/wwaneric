@@ -159,20 +159,6 @@ QString ModemStatusView::name() const
   return tr("Modem status");
 }
 
-bool ModemStatusView::event(QEvent *e)
-{
-  if (e->type() == ModemEventType)
-  {
-
-    e->accept();
-    return true;
-  }
-  else
-  {
-    return QWidget::event(e);
-  }
-}
-
 void ModemStatusView::processConnectionEvent(Core::ConnectionEvent event, const QVariant& data)
 {
   if (event == Core::ConnectionEventCustom)
