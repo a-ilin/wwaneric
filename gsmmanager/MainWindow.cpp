@@ -7,7 +7,7 @@
 #include "ModemStatusView.h"
 #include "SmsView.h"
 #include "UssdView.h"
-#include "SettingsView.h"
+#include "SerialPortSettingsView.h"
 
 #include "ModemStatus.h"
 
@@ -153,7 +153,7 @@ QList<IView *> MainWindow::createViews(const QString &groupName)
   views.append(new ModemStatusView(groupName, this));
   views.append(new SmsView(groupName, this));
   views.append(new UssdView(groupName, this));
-  views.append(new SettingsView(groupName, this));
+  views.append(new SerialPortSettingsView(groupName, this));
 
   Settings set;
 

@@ -40,7 +40,6 @@ SOURCES += \
     Sms.cpp \
     Settings.cpp \
     SmsView.cpp \
-    SettingsView.cpp \
     ModemStatusView.cpp \
     UssdView.cpp \
     Ussd.cpp \
@@ -50,7 +49,8 @@ SOURCES += \
     ModemStatus.cpp \
     ModemUssd.cpp \
     AppSettingsDialog.cpp \
-    ModemInit.cpp
+    ModemInit.cpp \
+    SerialPortSettingsView.cpp
 
 HEADERS  += \
     common.h \
@@ -63,7 +63,6 @@ HEADERS  += \
     Sms.h \
     Settings.h \
     SmsView.h \
-    SettingsView.h \
     ModemStatusView.h \
     UssdView.h \
     Ussd.h \
@@ -72,15 +71,16 @@ HEADERS  += \
     ModemStatus.h \
     ModemUssd.h \
     AppSettingsDialog.h \
-    ModemInit.h
+    ModemInit.h \
+    SerialPortSettingsView.h
 
 FORMS    += \
     MainWindow.ui \
     SmsView.ui \
-    SettingsView.ui \
     ModemStatusView.ui \
     UssdView.ui \
-    AppSettingsDialog.ui
+    AppSettingsDialog.ui \
+    SerialPortSettingsView.ui
 
 RESOURCES += \
     icons.qrc

@@ -32,7 +32,7 @@ public:
 
   QString id() const
   {
-    return "Settings";
+    return "Status";
   }
 
   bool event(QEvent * e);

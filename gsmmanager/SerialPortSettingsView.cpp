@@ -1,5 +1,5 @@
-﻿#include "SettingsView.h"
-#include "ui_SettingsView.h"
+﻿#include "SerialPortSettingsView.h"
+#include "ui_SerialPortSettingsView.h"
 
 #include "common.h"
 
@@ -11,10 +11,10 @@
 
 #define DEFAULT_TO_CB_LINK_PROPERTY "defaultToCheckBoxLink"
 
-SettingsView::SettingsView(const QString& connectionId, QWidget *parent) :
+SerialPortSettingsView::SerialPortSettingsView(const QString& connectionId, QWidget *parent) :
   QWidget(parent),
   IView(connectionId),
-  ui(new Ui::SettingsView)
+  ui(new Ui::SerialPortSettingsView)
 {
   ui->setupUi(this);
   ui->closeButton->setEnabled(false);
@@ -22,16 +22,16 @@ SettingsView::SettingsView(const QString& connectionId, QWidget *parent) :
   connect(ui->openButton, SIGNAL(clicked()), this, SLOT(openPortClicked()));
   connect(ui->closeButton, SIGNAL(clicked()), this, SLOT(closePortClicked()));
 
-  connect(ui->showAdvancedSettings, SIGNAL(toggled(bool)), ui->advancedSettings, SLOT(setVisible(bool)));
-  ui->showAdvancedSettings->setChecked(false);
+  connect(ui->showAdvancedPortOptions, SIGNAL(toggled(bool)), ui->advancedPortOptions, SLOT(setVisible(bool)));
+  ui->showAdvancedPortOptions->setChecked(false);
 }
 
-SettingsView::~SettingsView()
+SerialPortSettingsView::~SerialPortSettingsView()
 {
   delete ui;
 }
 
-void SettingsView::changeEvent(QEvent *e)
+void SerialPortSettingsView::changeEvent(QEvent *e)
 {
   QWidget::changeEvent(e);
   switch (e->type())
@@ -44,7 +44,7 @@ void SettingsView::changeEvent(QEvent *e)
   }
 }
 
-void SettingsView::init()
+void SerialPortSettingsView::init()
 {
   // baud rate
   ui->baudRate->addItem("1200",   QSerialPort::Baud1200);
@@ -92,7 +92,7 @@ void SettingsView::init()
   connect(ui->stopBitsDefault, SIGNAL(stateChanged(int)), SLOT(defaultCheckBoxStateChanged(int)));
 }
 
-void SettingsView::tini()
+void SerialPortSettingsView::tini()
 {
 
 }
@@ -133,7 +133,7 @@ void SettingsView::tini()
     } \
   }
 
-void SettingsView::restore(Settings &set)
+void SerialPortSettingsView::restore(Settings &set)
 {
   QString serialPortName = set.value("SerialPort").toString();
   int currentIndex = 0;
@@ -172,7 +172,7 @@ void SettingsView::restore(Settings &set)
   set.setValue("SerialPort_" # ClassName, ui->option->currentData().toInt()); \
   set.setValue("SerialPort_" # ClassName "_default", ui->option ## Default->isChecked() ? 1 : 0);
 
-void SettingsView::store(Settings &set)
+void SerialPortSettingsView::store(Settings &set)
 {
   set.setValue("SerialPort", ui->cbComPort->currentData().toString());
   set.setValue("SerialPort_openAtStartup", ui->openPortAtStartup->isChecked() ? 1 : 0);
@@ -184,12 +184,12 @@ void SettingsView::store(Settings &set)
   STORE_ADV_OPTION(stopBits,    StopBits);
 }
 
-QString SettingsView::name() const
+QString SerialPortSettingsView::name() const
 {
-  return tr("Settings");
+  return tr("Serial port settings");
 }
 
-void SettingsView::processConnectionEvent(Core::ConnectionEvent event, const QVariant& data)
+void SerialPortSettingsView::processConnectionEvent(Core::ConnectionEvent event, const QVariant& data)
 {
   if (event == Core::ConnectionEventStatus)
   {
@@ -206,12 +206,12 @@ void SettingsView::processConnectionEvent(Core::ConnectionEvent event, const QVa
 
     ui->openButton->setEnabled(!opened);
     ui->cbComPort->setEnabled(!opened);
-    ui->advancedSettings->setEnabled(!opened);
+    ui->advancedPortOptions->setEnabled(!opened);
     ui->closeButton->setEnabled(opened);
   }
 }
 
-void SettingsView::openPortClicked()
+void SerialPortSettingsView::openPortClicked()
 {
   QString portName = ui->cbComPort->currentData().toString();
 
@@ -230,12 +230,12 @@ void SettingsView::openPortClicked()
   Core::instance()->openConnection(connectionId(), portName, options);
 }
 
-void SettingsView::closePortClicked()
+void SerialPortSettingsView::closePortClicked()
 {
   Core::instance()->closeConnection(connectionId());
 }
 
-void SettingsView::defaultCheckBoxStateChanged(int state)
+void SerialPortSettingsView::defaultCheckBoxStateChanged(int state)
 {
   QObject * s = sender();
   Q_ASSERT(s);

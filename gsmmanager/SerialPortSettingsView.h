@@ -1,5 +1,5 @@
-﻿#ifndef SETTINGSVIEW_H
-#define SETTINGSVIEW_H
+﻿#ifndef SERIALPORTSETTINGSVIEW_H
+#define SERIALPORTSETTINGSVIEW_H
 
 #include "IView.h"
 
@@ -7,16 +7,16 @@
 
 namespace Ui
 {
-  class SettingsView;
+  class SerialPortSettingsView;
 }
 
-class SettingsView : public QWidget, public IView
+class SerialPortSettingsView : public QWidget, public IView
 {
   Q_OBJECT
 
 public:
-  explicit SettingsView(const QString &connectionId, QWidget *parent = 0);
-  ~SettingsView();
+  explicit SerialPortSettingsView(const QString &connectionId, QWidget *parent = 0);
+  ~SerialPortSettingsView();
 
   void init();
   void tini();
@@ -30,7 +30,7 @@ public:
 
   QString id() const
   {
-    return "Settings";
+    return "SerialPortSettings";
   }
 
   void processConnectionEvent(Core::ConnectionEvent event, const QVariant &data);
@@ -53,8 +53,8 @@ private slots:
   void defaultCheckBoxStateChanged(int state);
 
 private:
-  Ui::SettingsView *ui;
+  Ui::SerialPortSettingsView *ui;
 
 };
 
-#endif // SETTINGSVIEW_H
+#endif // SERIALPORTSETTINGSVIEW_H

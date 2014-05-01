@@ -156,7 +156,7 @@ void ModemStatusView::store(Settings &set)
 
 QString ModemStatusView::name() const
 {
-  return tr("Modem Status");
+  return tr("Modem status");
 }
 
 bool ModemStatusView::event(QEvent *e)
