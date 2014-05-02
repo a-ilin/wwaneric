@@ -16,14 +16,15 @@
 #include <vector>
 #include <iterator>
 
+#include <QString>
+
 class Pdu_Data_Coding;
 
 class Pdu_User_Data
 {
     Pdu_Packed *packed_;
-    std::string userdata_;
+    QString userdata_;
     unsigned int userDataLength_;
-    unsigned char *userData8Bit_;
     unsigned int userHeaderLength_;
     std::vector<Pdu_User_Data_Header *> userDataHeader_;
 
@@ -40,8 +41,7 @@ public:
     iterator getIterator ( void ) const { return userDataHeader_.begin() ; }
     iterator getEndIterator ( void ) const { return userDataHeader_.end() ; }
 
-    const char *getUserDataAsCStr ( void ) const { return userdata_.c_str(); }
-    const std::string &getUserDataAsString ( void ) const { return userdata_; }
+    const QString &getUserData ( void ) const { return userdata_; }
     unsigned int getUserDataLength ( void ) const { return userDataLength_; }
 
 };

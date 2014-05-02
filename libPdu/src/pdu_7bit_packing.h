@@ -12,6 +12,8 @@
 
 #include <string>
 
+#include <QString>
+
 class Pdu_Packed;
 
 class Pdu_7Bit_Packing
@@ -23,7 +25,7 @@ class Pdu_7Bit_Packing
 public:
   //  Pdu_7Bit_Packing ( ) ;
     Pdu_7Bit_Packing ( Pdu_Packed *packed);
-    void unpackSeptetLength ( std::string &output, int septets, int startSeptet = 0 );
+    void unpackSeptetLength ( QString &output, int septets, int startSeptet = 0 );
     void unpack (std::string &output, unsigned int semiOctets );
 };
 

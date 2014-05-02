@@ -2,11 +2,12 @@
 
 #include "../pdu/pdu.h"
 
+#include "../libPdu/src/pdu_deliver.h"
+
 #include "common.h"
 
 #include <QSqlDatabase>
 #include <QSqlError>
-
 
 bool checkSmsStorage(int storage)
 {
@@ -64,6 +65,7 @@ Sms::Sms(SMS_STORAGE storage, int index, SMS_STATUS status, const QByteArray &ra
   rawData(rawData)
 {
   const char * pduString = rawData.constData();
+#if 0
   PDU pdu(pduString);
   if (pdu.parse())
   {
@@ -98,6 +100,53 @@ Sms::Sms(SMS_STORAGE storage, int index, SMS_STATUS status, const QByteArray &ra
     valid = false;
     parseError = QString::fromLatin1(pdu.getError());
   }
+#else
+  Pdu_Deliver * pdu = static_cast<Pdu_Deliver*> (Pdu::create(std::string(pduString)));
+
+  if (pdu)
+  {
+    smsc = pdu->getSmsc().getValueAsCStr();
+    sender = pdu->getSenderNumberAsCStr();
+    userText = pdu->getUserData()->getUserData();
+
+    // calculate datetime
+    QString timestamp = pdu->getTimeStamp();
+    int tzOffsetSeconds = 0;
+    if (timestamp.size() == 14)
+    {
+      // timezone
+      {
+        // highest bit is set to 1 if the TZ offset is negative
+        int sign = 1;
+        char tzHigh = timestamp.mid(12, 1).toUInt(NULL, 16);
+        if (tzHigh & 0x80)
+        {
+          sign = -1;
+          tzHigh &= 0x7F;
+        }
+        char tzLow = timestamp.mid(13, 1).toUInt(NULL, 16);
+
+        tzOffsetSeconds = (tzHigh * 10 + tzLow) * sign * 15 * 60;
+      }
+
+      QDate date = QDate::fromString(timestamp.mid(0, 6), "yyMMdd");
+      // in version Qt 5.2.1 QDate uses 1900 as default year
+      if (date < QDate(2000, 1, 1))
+      {
+        date = date.addYears(100);
+      }
+
+      QTime time = QTime::fromString(timestamp.mid(6, 6), "hhmmss");
+
+      dateTime = QDateTime(date, time, Qt::OffsetFromUTC, tzOffsetSeconds);
+    }
+  }
+  else
+  {
+    valid = false;
+  }
+
+#endif
 }
 
 

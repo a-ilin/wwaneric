@@ -37,7 +37,7 @@ Pdu_7Bit_Packing::Pdu_7Bit_Packing ( ) : packed_ ( 0 )
  *              includes terminating null
  */
 
-void Pdu_7Bit_Packing::unpackSeptetLength ( std::string &output, int septets, int startSeptet)
+void Pdu_7Bit_Packing::unpackSeptetLength ( QString &output, int septets, int startSeptet)
 {
     int mask = 0x7f;
     int shift = 0;

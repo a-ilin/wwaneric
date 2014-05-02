@@ -12,7 +12,7 @@ DESTDIR = ..
 
 #LIBS += -L$$OUT_PWD/../pdu-bin/release/ -lpdu
 #LIBS += -L$$DESTDIR -L$$OUT_PWD -lpdu
-LIBS += -L$$DESTDIR -lpdu
+LIBS += -L$$DESTDIR -lpdu -llibPdu
 
 #INCLUDEPATH += $$PWD/../pdu-bin/include
 #DEPENDPATH += $$PWD/../pdu-bin

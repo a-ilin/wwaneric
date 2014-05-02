@@ -17,7 +17,6 @@
 Pdu_User_Data::Pdu_User_Data ( Pdu_Packed *packed, int length ) :
     packed_ ( packed ),
     userDataLength_ ( length ),
-    userData8Bit_ ( 0 ),
     userHeaderLength_ ( 0 )
   //, userDataHeader_ ( 0 )
 {
@@ -30,9 +29,7 @@ Pdu_User_Data::Pdu_User_Data ( Pdu_Packed *packed, int length ) :
  */
 Pdu_User_Data::~Pdu_User_Data ()
 {
-
-    if (userData8Bit_)
-        delete [] userData8Bit_;
+    userdata_.clear();
 
     unsigned int indx;
     for (indx = 0; indx < userDataHeader_.size(); indx++)
@@ -41,7 +38,6 @@ Pdu_User_Data::~Pdu_User_Data ()
     }
 
     userDataHeader_.clear();
-
 }
 
 /**
@@ -81,8 +77,20 @@ void Pdu_User_Data::decodeUserData ( const Pdu_Data_Coding &dataCoding )
     }
     else if ( dataCoding.getAlphabet () == Pdu_Data_Coding::ALPHABET_8BIT )
     {
-        userData8Bit_ = new unsigned char [  userDataLength_ - userHeaderLength_ ];
-        packed_->getBytes ( userData8Bit_,  userDataLength_ - userHeaderLength_);
+      unsigned char * buffer = new unsigned char [  userDataLength_ - userHeaderLength_ ];
+      packed_->getBytes ( buffer,  userDataLength_ - userHeaderLength_);
+      userdata_ = QString((char*)buffer);
+      delete[] buffer;
+    }
+    else if ( dataCoding.getAlphabet () == Pdu_Data_Coding::ALPHABET_UCS2 )
+    {
+      unsigned char * buffer = new unsigned char [  userDataLength_ - userHeaderLength_ + 4]; // BOM and \0
+      packed_->getBytes ( buffer + 2,  userDataLength_ - userHeaderLength_);
+      buffer[0] = 0xFE;
+      buffer[1] = 0xFF;
+
+      userdata_ = QString::fromUtf16((ushort*)(buffer), (userDataLength_ - userHeaderLength_) / 2 + 1);
+      delete[] buffer;
     }
 }
 
@@ -105,13 +113,8 @@ void Pdu_User_Data::dump ( void ) const
 
     if ( userdata_.length() )
     {
-        PDU_LOG->log ("User Data : %s\n", userdata_.c_str() );
-        PDU_LOG->hexDump ( userdata_.c_str(), userDataLength_ );
-    }
-    else if  ( userData8Bit_ )
-    {
-        PDU_LOG->log ( "8 Bit data dump\n" );
-        PDU_LOG->hexDump ( userData8Bit_, userDataLength_ - userHeaderLength_ );
+        PDU_LOG->log ("User Data : %s\n", userdata_.toLocal8Bit().constData() );
+        PDU_LOG->hexDump ( userdata_.toLocal8Bit().constData(), userDataLength_ );
     }
 
 }
