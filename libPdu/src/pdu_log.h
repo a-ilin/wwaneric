@@ -12,9 +12,11 @@
 
 #include <stdarg.h>
 
+#include "common.h"
+
 #define PDU_LOG Pdu_Log::instance()
 
-class Pdu_Log {
+class PDU_DECODE_API Pdu_Log {
     
     typedef void (callback) (const char *); 
 

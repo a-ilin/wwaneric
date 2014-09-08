@@ -1,12 +1,18 @@
-
 QT       -= gui
+TEMPLATE = lib
 
 TARGET = pdu
-TEMPLATE = lib
 
 DEFINES += PDU_DECODE_EXPORTS
 
-QMAKE_CXXFLAGS += -std=c++0x
+win32-msvc* {
+  # MSVC
+  # Disable C996 Warning
+  DEFINES += _CRT_SECURE_NO_WARNINGS snprintf=_snprintf
+} else {
+  # MinGW
+  QMAKE_CXXFLAGS += -std=c++0x
+}
 
 SOURCES += \
     pdu.cpp

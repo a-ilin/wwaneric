@@ -183,6 +183,10 @@ Modem::Modem() :
   m_initTimer->setInterval(2000);
   m_initTimer->setSingleShot(true);
   connect(m_initTimer, SIGNAL(timeout()), SLOT(onInitTimeout()));
+
+  m_pingTimer = new QTimer(this);
+  m_pingTimer->setInterval(10000);
+  connect(m_pingTimer, SIGNAL(timeout()), SLOT(onPingTimeout()));
 }
 
 Modem::~Modem()
@@ -303,31 +307,55 @@ bool Modem::processConversation(const Conversation &c)
       {
         Q_LOGEX(LOG_VERBOSE_CRITICAL, "Modem is not initialized when answer received!");
       }
-      else if (m_modemInited && (handler == m_initHandler))
-      {
-        Q_LOGEX(LOG_VERBOSE_CRITICAL, "Modem is already initialized when initialization answer received!");
-      }
 
       handler->processConversation(request, c, status, data);
 
-      if ((status == ModemRequest::SuccessCompleted) && (handler == m_initHandler))
-      {
-        m_initTimer->stop();
-        m_modemInited = true;
-        modemDetected(true);
-      }
-
-      if(status == ModemRequest::Failure)
+      if (status == ModemRequest::SuccessCompleted)
       {
         if (handler == m_initHandler)
         {
-          Q_LOGEX(LOG_VERBOSE_ERROR, "Error occured on modem initialization!");
-          modemDetected(false);
+          switch(request->type())
+          {
+          case INIT_REQUEST_INIT:
+            m_initTimer->stop();
+            m_modemInited = true;
+            modemDetected(true);
+            break;
+          case INIT_REQUEST_PING:
+            m_pingReceived = true;
+            Q_LOGEX(LOG_VERBOSE_DEBUG, "Ping received!");
+            break;
+          default:
+            Q_LOGEX(LOG_VERBOSE_CRITICAL, QString("Unknown request type: %1 !").arg(request->type()));
+          }
+        }
+      }
+      else if (status == ModemRequest::SuccessNeedMoreData)
+      {
+
+      }
+      else if (status == ModemRequest::Failure)
+      {
+        if (handler == m_initHandler)
+        {
+          switch(request->type())
+          {
+          case INIT_REQUEST_INIT:
+            Q_LOGEX(LOG_VERBOSE_ERROR, "Error occured on modem initialization!");
+            closePort();
+            break;
+          case INIT_REQUEST_PING:
+            Q_LOGEX(LOG_VERBOSE_ERROR, "Error occured on ping processing")
+            onPingTimeout();
+            break;
+          default:
+            Q_LOGEX(LOG_VERBOSE_CRITICAL, QString("Unknown request type: %1 !").arg(request->type()));
+          }
         }
 
         if (c.status == Conversation::OK)
         {
-
+          // modem returned status OK but handler cannot process it
           QString str = QString("Unprocessed answer received. " ENDL
                                 "Request:"      ENDL
                                 "%1."           ENDL
@@ -462,17 +490,33 @@ QByteArray Modem::requestData() const
 
 void Modem::modemDetected(bool status)
 {
-  if (m_modemInited || (!status))
+  if (m_modemInited)
   {
-    m_modemInited = status;
-    PortController::modemDetected(status);
+    // modem was detected previously
+    if (status)
+    {
+      m_pingReceived = true;
+      onPingTimeout();
+    }
+    else
+    {
+      m_modemInited = false;
+      m_pingTimer->stop();
+    }
   }
-  else
+  else if (status)
   {
+    // modem detected but not initialized yet
+
     ModemRequest * initRequest = createRequest(m_initHandler->name(), INIT_REQUEST_INIT, 1);
     appendRequest(initRequest);
 
     m_initTimer->start();
+  }
+
+  if (m_modemInited || (!status))
+  {
+    PortController::modemDetected(status);
   }
 }
 
@@ -481,6 +525,23 @@ void Modem::onInitTimeout()
   if (!m_modemInited)
   {
     closePort();
+  }
+}
+
+void Modem::onPingTimeout()
+{
+  if (!m_pingReceived)
+  {
+    // modem disconnected or port hanged
+    closePort();
+  }
+  else
+  {
+    ModemRequest * pingRequest = createRequest(m_initHandler->name(), INIT_REQUEST_PING, 1);
+    appendRequest(pingRequest);
+    m_pingReceived = false;
+    // restart timer every shot to decrease processing jitter
+    m_pingTimer->start();
   }
 }
 

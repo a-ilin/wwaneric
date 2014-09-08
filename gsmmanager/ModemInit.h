@@ -8,6 +8,7 @@
 enum INIT_REQUEST_TYPE
 {
   INIT_REQUEST_INIT,
+  INIT_REQUEST_PING,
   INIT_REQUEST_LAST  // a value for type counting. not a real request type.
 };
 

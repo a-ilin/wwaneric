@@ -31,7 +31,7 @@ public:
   // widget itself
   virtual QWidget * widget() = 0;
 
-  // user showed name
+  // user displayed name
   virtual QString name() const = 0;
 
   // view id

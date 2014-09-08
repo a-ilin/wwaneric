@@ -1,59 +1,175 @@
-﻿#include <sys/time.h>
+﻿
+#ifdef _MSC_VER
+// MSVC compiler
+#include <winsock2.h>
+#include <time.h>
+#else
+// GCC/MinGW
+#include <sys/time.h>
+#endif
 
 #include <ctime>
 #include <iostream>
 #include <fstream>
 #include <locale>
 #include <stdlib.h>
-#include <unistd.h>
+//#include <unistd.h>
 #include <wchar.h>
 
 #include "log.h"
-#include "common.h"
 
 
-#ifdef LOG_USE_PTHREADS
+// line endings
+#if defined(_WIN32) || defined(_WIN64) || defined(__WIN32__) || defined(__WINDOWS__)
+#define ENDL "\r\n"
+#define WENDL L"\r\n"
+std::wostream& wendl(std::wostream& out)
+{
+  out.put(L'\r');
+  out.put(L'\n');
+  out.flush();
+  return out;
+}
+#else
+#define ENDL "\n"
+#define WENDL L"\n"
+std::wostream& wendl(std::wostream& out)
+{
+  out.put(L'\n');
+  out.flush();
+  return out;
+}
+#endif // F_OS_WINDOWS
+
+
+
+#ifdef LOG_MULTITHREADING
+// multithreading support
+
+bool mutexInitialized = false;
+
+#ifdef _MSC_VER
+// MSVC
+#if (WINVER < 0x0801)
+// XP,2003,Vista,2008,7
+#include <WinBase.h>
+#else
+// 8
+#include <Synchapi.h>
+#endif
+
+HANDLE logMutex;
+
+inline void mutexInit()
+{
+  logMutex = CreateMutex(NULL, FALSE, NULL);
+
+  if (!logMutex)
+  {
+    printf("CreateMutex error: %d" ENDL, GetLastError());
+  }
+
+  mutexInitialized = logMutex != NULL;
+}
+
+inline void mutexDeinit()
+{
+  CloseHandle(logMutex);
+  mutexInitialized = false;
+}
+
+inline bool mutexLock()
+{
+  if (!mutexInitialized)
+  {
+    return false;
+  }
+
+  DWORD result = WaitForSingleObject(logMutex, INFINITE);
+  if (result != WAIT_OBJECT_0)
+  {
+    printf("Cannot lock mutex! Logging message skipped! File: %s, Line: %s" ENDL, __FILE__, STRINGIFY(__LINE__));
+    return false;
+  }
+
+  return true;
+}
+
+inline void mutexUnlock()
+{
+  ReleaseMutex(logMutex);
+}
+
+#else // #ifdef _MSC_VER
+
+// GCC / MinGW
 #include <pthread.h>
 
 pthread_mutex_t logMutex;
 
-bool mutexInitialized = false;
 
-int startLogging()
+inline void mutexInit()
 {
-    int mutexResult = 0;
+  int code = pthread_mutex_init(&logMutex, NULL);
+  if (code)
+  {
+    printf("Error initializing pthread_mutex_t! pthread_mutex_init code: %d. Terminating..." ENDL, code);
+  }
 
-    if (!mutexInitialized)
-    {
-        mutexResult = pthread_mutex_init(&logMutex, NULL);
-
-        if (!mutexResult)
-        {
-            mutexInitialized = true;
-        }
-    }
-
-    return mutexResult;
+  mutexInitialized = code == 0;
 }
 
-int stopLogging()
+inline void mutexDeinit()
 {
-    int mutexResult = 0;
+  int code = pthread_mutex_destroy(&logMutex);
+  if(code)
+  {
+    printf("Error deinitializing pthread_mutex_t! pthread_mutex_destroy code: %d" ENDL, code);
+  }
 
-    if (mutexInitialized)
-    {
-        mutexResult = pthread_mutex_destroy(&logMutex);
-
-        if (!mutexResult)
-        {
-            mutexInitialized = false;
-        }
-    }
-
-    return mutexResult;
+  mutexInitialized = false;
 }
 
-#endif // LOG_USE_PTHREADS
+inline bool mutexLock()
+{
+  if (!mutexInitialized)
+  {
+    return false;
+  }
+
+  int mutexResult = pthread_mutex_lock(&logMutex);
+  if (mutexResult)
+  {
+    printf("Cannot lock pthread log mutex! Logging message skipped! File: %s, Line: %s" ENDL, __FILE__, STRINGIFY(__LINE__));
+    return false;
+  }
+
+  return true;
+}
+
+inline void mutexUnlock()
+{
+  int mutexResult = pthread_mutex_unlock(&logMutex);
+  if (mutexResult)
+  {
+    printf("Cannot unlock pthread log mutex! This is the problem! File: %s, Line: %s" ENDL, __FILE__, STRINGIFY(__LINE__));
+  }
+}
+
+#endif // #ifdef _MSC_VER
+#endif // LOG_MULTITHREADING
+
+bool startLogging()
+{
+    mutexInit();
+    return mutexInitialized;
+}
+
+void stopLogging()
+{
+    mutexDeinit();
+}
+
 
 // maximum log line length in characters
 #define MAX_LOG_MESSAGE_CHARACTERS 4096
@@ -182,25 +298,6 @@ protected:
 
 size_t null_wcodecvt::m_refs = 0;
 
-// line endings
-#ifdef F_OS_WINDOWS
-#define ENDL "\r\n"
-std::wostream& wendl(std::wostream& out)
-{
-  out.put(L'\r');
-  out.put(L'\n');
-  out.flush();
-  return out;
-}
-#else
-#define ENDL "\n"
-std::wostream& wendl(std::wostream& out)
-{
-  out.put(L'\n');
-  out.flush();
-  return out;
-}
-#endif // F_OS_WINDOWS
 
 #include <sys/stat.h>
 // Function: fileExists
@@ -237,9 +334,9 @@ void LogRaw(const std::wstring &str)
   }
   else
   {
-    std::wofstream output;
     null_wcodecvt wcodec;
     std::locale wloc(std::locale::classic(), &wcodec);
+    std::wofstream output;
     output.imbue(wloc);
 
     bool needProlog = false;
@@ -252,7 +349,7 @@ void LogRaw(const std::wstring &str)
 
     if (output.fail())
     {
-        wprintf(L"Error opening log file for logging: %s" ENDL, logFilePath.c_str());
+        wprintf(L"Error opening log file for logging: %s" WENDL, logFilePath.c_str());
         return;
     }
 
@@ -278,24 +375,14 @@ void LogFlush()
 // function controls log formatting
 void WriteLogEx(LOG_VERBOSE verbose, const wchar_t * position, const wchar_t * message)
 {
-#ifdef LOG_USE_PTHREADS
-
-  int mutexResult;
-
-  if (!mutexInitialized)
+#ifdef LOG_MULTITHREADING
+  if (!mutexLock())
   {
-    return;
-  }
-
-  mutexResult = pthread_mutex_lock(&logMutex);
-  if (mutexResult)
-  {
-    wprintf(L"Cannot lock pthread log mutex! Logging message skipped! File: %s, Line: %s" ENDL, WIDEN(__FILE__), WIDEN(STRINGIFY(__LINE__)));
     return;
   }
 #endif
 
-  // if we are like to receive only high valuable messages...
+  // if would like to receive only high valuable messages...
   std::wstring verboseStr;
   if (verbose >= currentVerbosity)
   {
@@ -337,8 +424,33 @@ void WriteLogEx(LOG_VERBOSE verbose, const wchar_t * position, const wchar_t * m
       time_t t = time(0);
       struct tm * now = localtime(&t);
 
+      long usec = 0;
+
+#ifdef _MSC_VER
+// MSVC compiler
+      const __int64 DELTA_EPOCH_IN_MICROSECS= 11644473600000000;
+
+      FILETIME ft;
+      __int64 tmpres = 0;
+      ZeroMemory(&ft,sizeof(ft));
+      GetSystemTimeAsFileTime(&ft);
+
+      tmpres = ft.dwHighDateTime;
+      tmpres <<= 32;
+      tmpres |= ft.dwLowDateTime;
+
+      /*converting file time to unix epoch*/
+      tmpres /= 10;  /*convert into microseconds*/
+      tmpres -= DELTA_EPOCH_IN_MICROSECS;
+
+      //sec = (__int32)(tmpres*0.000001);
+      usec =(tmpres%1000000);
+#else
+// GCC / MinGW
       struct timeval tv;
       gettimeofday(&tv, NULL);
+      usec = tv.tv_usec / 1000;
+#endif
 
       std::wstring formatStrPrivate = L"%04d-%02d-%02d %02d:%02d:%02d.%03d %ls %ls%ls";
 
@@ -349,7 +461,7 @@ void WriteLogEx(LOG_VERBOSE verbose, const wchar_t * position, const wchar_t * m
                             now->tm_hour,
                             now->tm_min,
                             now->tm_sec,
-                            tv.tv_usec / 1000,
+                            usec,
                             verboseStr.c_str(),
                             position,
                             message);
@@ -364,7 +476,7 @@ void WriteLogEx(LOG_VERBOSE verbose, const wchar_t * position, const wchar_t * m
         errMsg = L"Illegal multibyte character sequence";
       }
 
-      wprintf(L"Message formatting error occured: \"%s\". @: %s:%d" ENDL, errMsg.c_str(), WIDEN(__FILE__), __LINE__);
+      wprintf(L"Message formatting error occured: \"%s\". @: %s:%d" WENDL, errMsg.c_str(), WIDEN(__FILE__), __LINE__);
       perror(NULL);
 
       return;
@@ -384,13 +496,8 @@ void WriteLogEx(LOG_VERBOSE verbose, const wchar_t * position, const wchar_t * m
     }
   }
 
-#ifdef LOG_USE_PTHREADS
-  mutexResult = pthread_mutex_unlock(&logMutex);
-  if (mutexResult)
-  {
-    wprintf(L"Cannot unlock pthread log mutex! This is the problem! File: %s, Line: %s" ENDL, WIDEN(__FILE__), WIDEN(STRINGIFY(__LINE__)));
-    return;
-  }
+#ifdef LOG_MULTITHREADING
+  mutexUnlock();
 #endif
 
 }

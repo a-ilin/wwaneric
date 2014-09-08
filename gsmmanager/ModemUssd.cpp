@@ -31,10 +31,7 @@ static bool processUssdData(const QString& data, QString& msg, USSD_STATUS& stat
       Q_LOGEX(LOG_VERBOSE_ERROR, err);
     }
   }
-  else
-  {
-    Q_LOGEX(LOG_VERBOSE_ERROR, "Header size is too small!");
-  }
+
   return result;
 }
 

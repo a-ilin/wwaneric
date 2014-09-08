@@ -23,8 +23,9 @@
 
 #include <string>
 
+#include "common.h"
 
-class Pdu  : public Pdu_Base
+class PDU_DECODE_API Pdu  : public Pdu_Base
 {
     
     Pdu ( const std::string &pdu ) : Pdu_Base ( pdu ) {}

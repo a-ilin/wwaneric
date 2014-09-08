@@ -11,6 +11,8 @@ enum SMS_REQUEST_TYPE
 {
   SMS_REQUEST_CAPACITY,
   SMS_REQUEST_READ,
+  SMS_REQUEST_READ_BY_INDEX,
+  SMS_REQUEST_READ_UNEXPECTED,
   SMS_REQUEST_SEND,
   SMS_REQUEST_DELETE,
   SMS_REQUEST_LAST  // a value for type counting. not a real request type.
@@ -20,6 +22,12 @@ struct SmsArgsRead : public RequestArgs
 {
   SMS_STATUS smsStatus;
   SMS_STORAGE smsStorage;
+};
+
+struct SmsArgsReadByIndex : public RequestArgs
+{
+  SMS_STORAGE smsStorage;
+  int smsIndex;
 };
 
 struct SmsArgsDelete : public RequestArgs
@@ -47,6 +55,17 @@ struct SmsAnswerRead : public AnswerData
   QList<Sms> smsList;
 };
 
+struct SmsAnswerReadByIndex : public AnswerData
+{
+  Sms sms;
+};
+
+struct SmsAnswerReadUnexpected : public AnswerData
+{
+  SMS_STORAGE smsStorage;
+  int smsIndex;
+};
+
 class SmsConversationHandler : public ConversationHandler
 {
 public:
@@ -58,6 +77,10 @@ public:
   QByteArray requestData(const ModemRequest *request) const;
   int requestTypesCount() const;
   QString name() const;
+
+  bool processUnexpectedData(const QByteArray& data,
+                             int &replyType,
+                             AnswerData* &answerData) const;
 
 protected:
   RequestArgs* requestArgs(int type) const;

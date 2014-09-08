@@ -18,9 +18,11 @@
 
 #include <QString>
 
+#include "common.h"
+
 class Pdu_Data_Coding;
 
-class Pdu_User_Data
+class PDU_DECODE_API Pdu_User_Data
 {
     Pdu_Packed *packed_;
     QString userdata_;

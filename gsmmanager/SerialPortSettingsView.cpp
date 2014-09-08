@@ -157,7 +157,7 @@ void SerialPortSettingsView::restore(Settings &set)
   SAFE_CONVERT(int, toInt, openAtStartup, set.value("SerialPort_openAtStartup"), openAtStartup = 0;);
   if (openAtStartup)
   {
-    ui->openPortAtStartup->setChecked(Qt::Checked);
+    ui->openPortAtStartup->setChecked(true);
     QTimer::singleShot(1000, this, SLOT(openPortClicked()));
   }
 

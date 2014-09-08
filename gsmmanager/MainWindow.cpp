@@ -374,6 +374,7 @@ void MainWindow::updateSignalStrength(const QString& connectionId, double streng
 
 void MainWindow::removeViewGroup(const QString &groupName)
 {
+  // FIXME: remove archived SMS for group!
   QList<Box> boxes = m_boxes.values(groupName);
 
   if (boxes.size())
@@ -522,7 +523,7 @@ void MainWindow::onRemoveGroupAction()
 
   if (QMessageBox::question(this, tr("Remove connection?"),
                         tr("Are you really like to remove connection \"%1\"?" ENDL
-                           "All locally stored settings and info will be removed.")
+                           "Archived messages, stored settings and other info will be removed.")
                             .arg(groupName),
                         QMessageBox::Yes, QMessageBox::No) == QMessageBox::Yes)
   {

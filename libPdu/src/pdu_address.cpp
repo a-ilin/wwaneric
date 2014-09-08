@@ -20,7 +20,7 @@ void Pdu_Address::dump ( void ) const
     PDU_LOG->log ( "Pdu_Address Dump\n");
     PDU_LOG->log ( "  length : %d\n", length_ );
     PDU_LOG->log ( "  type : %#x\n", type_ );
-    PDU_LOG->log ( "  value : %s\n", value_.c_str() );
+    PDU_LOG->log ( "  value : %s\n", value_.toLocal8Bit().constData() );
     
 }
 

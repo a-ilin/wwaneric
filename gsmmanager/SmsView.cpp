@@ -10,41 +10,815 @@
 #include <QStandardItemModel>
 #include <QTableView>
 
+
+bool smsConcatLessThen(const Sms& first, const Sms& second)
+{
+  return first.concatPartNumber < second.concatPartNumber;
+}
+
+// return:
+// negative if first is less
+// zero if equal
+// positive otherwise
+int smsGroupCompare(const Sms& first, const Sms& second)
+{
+  int result = 0;
+
+  result = first.storage - second.storage;
+  if (result) return result;
+
+  result = first.status - second.status;
+  if (result) return result;
+
+  result = first.sender.compare(second.sender);
+  if (result) return result;
+
+  // some operators uses distributed SMSC (like MTS Russia)
+  // and SMS parts can be delivered through different SMSC
+  //result = first.smsc - second.smsc;
+  //if (result) return result;
+
+  result = first.concatReference - second.concatReference;
+  if (result) return result;
+
+  result = first.concatTotalCount - second.concatTotalCount;
+  if (result) return result;
+
+  return 0;
+}
+
+bool smsListLessThen(const SmsList& first, const SmsList& second)
+{
+  Q_ASSERT(!first.isEmpty());
+  Q_ASSERT(!second.isEmpty());
+
+  return smsGroupCompare(first.first(), second.first()) < 0;
+}
+
+SmsModel::SmsModel(const QString& connectionId, QObject* parent) :
+  QStandardItemModel(parent),
+  m_connectionId(connectionId),
+  m_archivedCount(0)
+{
+  setColumnCount(ColumnLast);
+
+  // read SMS stored in DB
+  SmsDatabaseEntity smsDb;
+  if (smsDb.init())
+  {
+    DatabaseKey key;
+    key.insert("a_connection", m_connectionId);
+    QList<SmsBase> smsBaseList = smsDb.select(key);
+
+    foreach(const SmsBase& smsBase, smsBaseList)
+    {
+      Sms sms(smsBase.storage, -1, smsBase.status, smsBase.rawData);
+      if (!sms.valid)
+      {
+        Q_LOGEX(LOG_VERBOSE_ERROR, sms.parseError);
+      }
+      else
+      {
+        addSms(sms, false);
+      }
+    }
+  }
+}
+
+void SmsModel::addSms(const Sms& sms, bool archive)
+{
+  int msgRow = -1;
+
+  // FIXME: optimize it!
+  // find uniqueness
+  for (QList<SmsList>::iterator iter = m_smsList.begin(); iter < m_smsList.end(); ++iter)
+  {
+    SmsList& smsList = *iter;
+    Q_ASSERT(smsList.size());
+    if (!smsGroupCompare(sms, smsList.first()))
+    {
+      for (SmsList::iterator smsIter = smsList.begin(); smsIter < smsList.end(); ++smsIter)
+      {
+        Sms& iSms = *smsIter;
+        if (sms.rawData == iSms.rawData)
+        {
+          // restore SMS index
+          iSms.index = sms.index;
+          msgRow = iter - m_smsList.begin();
+          updateRowData(msgRow);
+          return;
+        }
+      }
+    }
+  }
+
+  // SMS concatenation
+  if ((sms.concatPartNumber >= 1) &&
+      (sms.concatPartNumber <= sms.concatTotalCount))
+  {
+    for(QList<SmsList>::iterator iter = m_smsList.begin(); iter < m_smsList.end(); ++iter)
+    {
+      SmsList& smsList = *iter;
+      Q_ASSERT(smsList.size());
+
+      const Sms& iSms = smsList.first();
+
+      if ((!smsGroupCompare(iSms, sms)) &&
+          (iSms.concatPartNumber >= 1) &&
+          (iSms.concatPartNumber <= iSms.concatTotalCount))
+      {
+        bool collision = false;
+        foreach(const Sms& iSms, smsList)
+        {
+          if (iSms.concatPartNumber == sms.concatPartNumber)
+          {
+            collision = true;
+            break;
+          }
+        }
+
+        if(!collision)
+        {
+          msgRow = iter - m_smsList.begin();
+          smsList.append(sms);
+          // reorder smsList according to part number
+          std::sort(smsList.begin(), smsList.end(), smsConcatLessThen);
+          break;
+        }
+      }
+    }
+  }
+
+  ++m_usedStorage[sms.storage];
+
+  // if need to append new message into the model
+  if (msgRow == -1)
+  {
+    m_smsList.append(SmsList() << sms);
+
+    QList<QStandardItem*> appItems;
+    for (int i=0; i< ColumnLast; ++i)
+    {
+      appItems.append(new QStandardItem());
+    }
+
+    msgRow = rowCount();
+    ++m_statusCount[sms.status];
+    appendRow(appItems);
+
+    if (archive || isArchived(sms))
+    {
+      ++m_archivedCount;
+    }
+  }
+
+  Q_ASSERT(msgRow != -1);
+
+  if (archive)
+  {
+    archiveSms(msgRow);
+  }
+
+  updateRowData(msgRow);
+}
+
+SMS_STATUS SmsModel::smsStatus(int row) const
+{
+  const SmsList& smsList = m_smsList.at(row);
+  Q_ASSERT(smsList.size());
+  SMS_STATUS status = smsList.first().status;
+  return status;
+}
+
+SMS_STORAGE SmsModel::smsStorage(int row) const
+{
+  const SmsList& smsList = m_smsList.at(row);
+  Q_ASSERT(smsList.size());
+  SMS_STORAGE storage = smsList.first().storage;
+  return storage;
+}
+
+QList<int> SmsModel::smsIndices(int row) const
+{
+  const SmsList& smsList = m_smsList.at(row);
+  Q_ASSERT(smsList.size());
+  QList<int> indices;
+  foreach (const Sms& sms, smsList)
+  {
+    if (sms.index != -1)
+    {
+      indices.append(sms.index);
+    }
+  }
+
+  return indices;
+}
+
+QString SmsModel::smsText(int row) const
+{
+  const SmsList& smsList = m_smsList.at(row);
+  Q_ASSERT(smsList.size());
+
+  QString msg;
+  foreach(const Sms& sms, smsList)
+  {
+    msg += sms.userText;
+  }
+
+  return msg;
+}
+
+QDateTime SmsModel::smsDate(int row) const
+{
+  const SmsList& smsList = m_smsList.at(row);
+  Q_ASSERT(smsList.size());
+  return smsList.last().dateTime;
+}
+
+QString SmsModel::smsSender(int row) const
+{
+  const SmsList& smsList = m_smsList.at(row);
+  Q_ASSERT(smsList.size());
+  return smsList.last().sender;
+}
+
+QString SmsModel::smsSC(int row) const
+{
+  const SmsList& smsList = m_smsList.at(row);
+  Q_ASSERT(smsList.size());
+  return smsList.last().smsc;
+}
+
+int SmsModel::smsSizeCount(int row) const
+{
+  const SmsList& smsList = m_smsList.at(row);
+  Q_ASSERT(smsList.size());
+  return smsList.size();
+}
+
+bool SmsModel::isArchived(int row) const
+{
+  const SmsList& smsList = m_smsList.at(row);
+  Q_ASSERT(smsList.size());
+  bool inArchive = true;
+  foreach(const Sms& sms, smsList)
+  {
+    if (!isArchived(sms))
+    {
+      inArchive = false;
+      break;
+    }
+  }
+
+  return inArchive;
+}
+
+bool SmsModel::isArchived(const Sms& sms) const
+{
+  SmsDatabaseEntity smsDb;
+  if (smsDb.init())
+  {
+    DatabaseKey key;
+    key.insert("a_connection", m_connectionId);
+    key.insert("i_storage", sms.storage);
+    key.insert("i_status", sms.status);
+    key.insert("a_raw", QString(sms.rawData));
+    QList<SmsBase> list = smsDb.select(key);
+    Q_ASSERT(list.size() <= 1);
+    if(!list.isEmpty())
+    {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+int SmsModel::statusCount(SMS_STATUS status) const
+{
+  return m_statusCount.value(status);
+}
+
+int SmsModel::storageCount(SMS_STORAGE storage) const
+{
+  return m_usedStorage.value(storage);
+}
+
+int SmsModel::archivedCount() const
+{
+  return m_archivedCount;
+}
+
+void SmsModel::archiveSms(int row)
+{
+  SmsDatabaseEntity smsDb;
+  if (smsDb.init())
+  {
+    QList<SmsBase> smsBaseList;
+
+    foreach(const Sms& sms, m_smsList.at(row))
+    {
+        SmsBase smsBase;
+        smsBase.connectionId = m_connectionId;
+        smsBase.storage = sms.storage;
+        smsBase.status = sms.status;
+        smsBase.rawData = sms.rawData;
+        smsBaseList.append(smsBase);
+    }
+
+    if (smsDb.insert(smsBaseList))
+    {
+      ++m_archivedCount;
+    }
+  }
+}
+
+void SmsModel::deleteSmsDevice(SMS_STORAGE storage, int smsIndex)
+{
+  Q_ASSERT(smsIndex != -1);
+
+  // find corresponding row
+  // FIXME: optimize it!
+  int msgRow = -1;
+  for (QList<SmsList>::iterator iter = m_smsList.begin(); iter < m_smsList.end(); ++iter)
+  {
+    SmsList& smsList = *iter;
+    Q_ASSERT(smsList.size());
+    SMS_STATUS status = smsList.first().status;
+    if (smsList.first().storage == storage)
+    {
+      for (SmsList::iterator smsIter = smsList.begin(); smsIter < smsList.end(); ++smsIter)
+      {
+        msgRow = iter - m_smsList.begin();
+
+        Sms& sms = *smsIter;
+        if (sms.index == smsIndex)
+        {
+          if (isArchived(sms))
+          {
+            // change index only
+            sms.index = -1;
+          }
+          else
+          {
+            // delete sms from model
+            smsIter = smsList.erase(smsIter);
+            --m_usedStorage[storage];
+
+            if (!smsList.size())
+            {
+              // if there is no other sms in the row delete the row
+              --m_statusCount[status];
+              iter = m_smsList.erase(iter);
+              removeRows(msgRow, 1);
+              msgRow = -1;
+            }
+          }
+
+          break;
+        }
+      }
+    }
+  }
+
+  if (msgRow != -1)
+  {
+    updateRowData(msgRow);
+  }
+}
+
+void SmsModel::deleteSmsDevice()
+{
+  QList<SmsList>::iterator iter = m_smsList.begin();
+
+  while (iter < m_smsList.end())
+  {
+    int msgRow = iter - m_smsList.begin();
+    SmsList& smsList = *iter;
+    Q_ASSERT(smsList.size());
+
+    if (isArchived(msgRow))
+    {
+      // change index only to invalid
+      for (SmsList::iterator smsIter = smsList.begin(); smsIter < smsList.end(); ++smsIter)
+      {
+        Sms& sms = *smsIter;
+        sms.index = -1;
+      }
+
+      updateRowData(msgRow);
+      ++iter;
+    }
+    else
+    {
+      // remove entire row
+      --m_statusCount[smsList.first().status];
+      iter = m_smsList.erase(iter);
+      removeRows(msgRow, 1);
+    }
+  }
+
+  m_usedStorage.clear();
+}
+
+void SmsModel::deleteSmsArchive(int row)
+{
+  bool rmRow = false;
+  SMS_STATUS rmStatus;
+
+  SmsDatabaseEntity smsDb;
+  if (smsDb.init())
+  {
+    SmsList& smsList = m_smsList[row];
+    for (SmsList::iterator smsIter = smsList.begin(); smsIter < smsList.end(); ++smsIter)
+    {
+      Sms& sms = *smsIter;
+
+      DatabaseKey key;
+      key.insert("a_connection", m_connectionId);
+      key.insert("i_storage", sms.storage);
+      key.insert("i_status", sms.status);
+      key.insert("a_raw", sms.rawData);
+
+      if (smsDb.delet(key))
+      {
+        --m_archivedCount;
+
+        // if that SMS existed in archive only
+        if (sms.index == -1)
+        {
+          rmRow = true;
+          rmStatus = sms.status;
+        }
+      }
+    }
+  }
+
+  if (rmRow)
+  {
+    // remove entire row
+    --m_statusCount[rmStatus];
+    removeRows(row, 1);
+  }
+}
+
+QVariant SmsModel::data(const QModelIndex& index, int role) const
+{
+  if (role == Qt::UserRole)
+  {
+    // UserRole used as sort role
+    switch(index.column())
+    {
+    case ColumnArchive:
+      return isArchived(index.row()) ? 1 : 0;
+    case ColumnStorage:
+      return smsStorage(index.row());
+    case ColumnStatus:
+      return smsStatus(index.row());
+    case ColumnDate:
+      return smsDate(index.row());
+    case ColumnNumber:
+      return smsSender(index.row());
+    case ColumnMessage:
+      return smsText(index.row());
+    default:
+      Q_ASSERT(false);
+    }
+
+    return QStandardItemModel::data(index, Qt::DisplayRole);
+  }
+
+  return QStandardItemModel::data(index, role);
+}
+
+void SmsModel::updateRowData(int row)
+{
+  const SmsList& smsList = m_smsList.at(row);
+  Q_ASSERT(smsList.size());
+
+  /*
+   * Archive
+   */
+  QStandardItem * itemArchive = item(row, ColumnArchive);
+  Q_ASSERT(itemArchive);
+  QIcon archiveIcon = isArchived(row) ? QIcon("icons/sms_archive.png") : QIcon();
+  itemArchive->setIcon(archiveIcon);
+
+  /*
+   * Storage
+   */
+  bool inDevice = false;
+  foreach (const Sms& sms, smsList)
+  {
+    if (sms.index != -1)
+    {
+      inDevice = true;
+    }
+  }
+
+  QIcon storageIcon;
+  switch(smsStorage(row))
+  {
+  case SMS_STORAGE_PHONE:
+    storageIcon = (!inDevice) ? QIcon("icons/sms_modem_gray.png") :
+                                QIcon("icons/sms_modem.png");
+    break;
+  case SMS_STORAGE_SIM:
+    storageIcon = (!inDevice) ? QIcon("icons/sms_sim_gray.png") :
+                                QIcon("icons/sms_sim.png");
+    break;
+  default:
+    Q_LOGEX(LOG_VERBOSE_CRITICAL, "Unknown storage!");
+  }
+
+  QStandardItem * itemStorage = item(row, ColumnStorage);
+  Q_ASSERT(itemStorage);
+  itemStorage->setIcon(storageIcon);
+
+  /*
+   * Status
+   */
+  QIcon statusIcon;
+  switch (smsStatus(row))
+  {
+  case SMS_STATUS_NEW:
+    statusIcon = QIcon("icons/sms_unread.png");
+    break;
+  case SMS_STATUS_INCOME:
+    statusIcon = QIcon("icons/sms_income.png");
+    break;
+  case SMS_STATUS_DRAFT:
+    statusIcon = QIcon("icons/sms_draft.png");
+    break;
+  case SMS_STATUS_SENT:
+    statusIcon = QIcon("icons/sms_sent.png");
+    break;
+  default:
+    Q_LOGEX(LOG_VERBOSE_CRITICAL, "Unknown status!");
+  }
+
+  QStandardItem * itemStatus = item(row, ColumnStatus);
+  Q_ASSERT(itemStatus);
+  itemStatus->setIcon(statusIcon);
+
+  /*
+   * Sender
+   */
+  QStandardItem * itemSender = item(row, ColumnNumber);
+  Q_ASSERT(itemSender);
+  itemSender->setText(smsSender(row));
+
+  /*
+   * Date
+   */
+  QStandardItem * itemDate = item(row, ColumnDate);
+  Q_ASSERT(itemDate);
+  itemDate->setText(smsDate(row).toString(Qt::DefaultLocaleShortDate));
+
+  /*
+   * Text
+   */
+  QStandardItem * itemText = item(row, ColumnMessage);
+  Q_ASSERT(itemText);
+  itemText->setText(smsText(row));
+
+  /*
+   * ToolTip
+   */
+  QString smsTooltip =
+      tr("SMS service center: %1").arg(smsList.first().smsc) + QString(ENDL) +
+      tr("Message contains %1 SMS(es)").arg(smsList.size());
+
+  for(int c=0; c< ColumnLast; ++c)
+  {
+    QStandardItem * i = item(row, c);
+    Q_ASSERT(i);
+    i->setToolTip(smsTooltip);
+  }
+
+}
+
+// property names for UI buttons
 #define SMS_STATUS_PROPERTY "smsStatus"
 #define SMS_STORAGE_PROPERTY "smsStorage"
+
 
 SmsView::SmsView(const QString& connectionId, QWidget *parent) :
   QWidget(parent),
   IView(connectionId),
-  ui(new Ui::SmsView)
+  ui(new Ui::SmsView),
+  m_autoArchiveOnRead(false),
+  m_totalSim(0),
+  m_totalPhone(0)
 {
   ui->setupUi(this);
+}
 
-  // source model
-  m_sourceModel = new QStandardItemModel(0, ColumnLast, this);
-  m_sourceModel->setColumnCount(ColumnLast);
+SmsView::~SmsView()
+{
+  delete ui;
+}
+
+void SmsView::changeEvent(QEvent *e)
+{
+  QWidget::changeEvent(e);
+  switch (e->type())
+  {
+  case QEvent::LanguageChange:
+    ui->retranslateUi(this);
+    retranslateUi();
+    break;
+  default:
+    break;
+  }
+}
+
+void SmsView::retranslateUi()
+{
   QStringList headerLabels;
   headerLabels
-      << ""   // status
-      << ""   // storage
-      << "Date"
-      << "Number"
-      << "Message";
+      << tr("Archived")
+      << tr("Status")
+      << tr("Storage")
+      << tr("Date")
+      << tr("Number")
+      << tr("Message");
   m_sourceModel->setHorizontalHeaderLabels(headerLabels);
+}
+
+void SmsView::processConnectionEvent(Core::ConnectionEvent event, const QVariant& data)
+{
+  Core * c = Core::instance();
+
+  if (event == Core::ConnectionEventCustom)
+  {
+    ModemReply* reply = data.value<ModemReply*>();
+    Q_ASSERT(reply);
+
+    if ((reply->handlerName() == SMS_HANDLER_NAME))
+    {
+      switch(reply->type())
+      {
+      case SMS_REQUEST_CAPACITY:
+      {
+        if (reply->status())
+        {
+          SmsAnswerCapacity * answer = static_cast<SmsAnswerCapacity*> (reply->data());
+
+          m_totalPhone = answer->phoneTotal;
+          m_totalSim   = answer->simTotal;
+        }
+        else
+        {
+          m_totalSim = -1;
+          m_totalPhone = -1;
+        }
+      }
+        break;
+      case SMS_REQUEST_READ:
+      {
+        if (reply->status())
+        {
+          SmsAnswerRead * answer = static_cast<SmsAnswerRead*> (reply->data());
+
+          foreach(const Sms& sms, answer->smsList)
+          {
+            m_sourceModel->addSms(sms, m_autoArchiveOnRead);
+          }
+
+          updateCounters();
+        }
+        else
+        {
+          // TODO: show an error message
+        }
+      }
+        break;
+      case SMS_REQUEST_READ_BY_INDEX:
+      {
+        if (reply->status())
+        {
+          SmsAnswerReadByIndex * answer = static_cast<SmsAnswerReadByIndex*> (reply->data());
+
+          m_sourceModel->addSms(answer->sms, m_autoArchiveOnRead);
+          updateCounters();
+        }
+        else
+        {
+          // TODO: show an error message
+        }
+      }
+        break;
+      case SMS_REQUEST_READ_UNEXPECTED:
+      {
+        Q_ASSERT(reply->status());
+        SmsAnswerReadUnexpected * answer = static_cast<SmsAnswerReadUnexpected*> (reply->data());
+
+        // sms reading by index and storage
+        {
+          ModemRequest * request = c->modemRequest(connectionId(), SMS_HANDLER_NAME, SMS_REQUEST_READ_BY_INDEX, 1);
+          SmsArgsReadByIndex * args = static_cast<SmsArgsReadByIndex*> (request->args());
+          args->smsIndex = answer->smsIndex;
+          args->smsStorage = answer->smsStorage;
+          c->pushRequest(request);
+        }
+      }
+        break;
+      case SMS_REQUEST_DELETE:
+      {
+        if (reply->status())
+        {
+          SmsAnswerDeleted * answer = static_cast<SmsAnswerDeleted*> (reply->data());
+          m_sourceModel->deleteSmsDevice(answer->smsStorage, answer->smsIndex);
+        }
+        else
+        {
+          // TODO: show an error message
+        }
+      }
+        break;
+      case SMS_REQUEST_SEND:
+      {
+        if (reply->status())
+        {
+
+        }
+        else
+        {
+          // TODO: show an error message
+        }
+      }
+        break;
+      default:
+        Q_ASSERT(false);
+        Q_LOGEX(LOG_VERBOSE_CRITICAL, "Unknown reply type received!");
+      }
+    }
+  }
+  else if (event == Core::ConnectionEventStatus)
+  {
+    bool opened = data.toBool();
+
+    if (opened)
+    {
+      // capacity request
+      c->pushRequest(c->modemRequest(connectionId(), SMS_HANDLER_NAME, SMS_REQUEST_CAPACITY, 1));
+
+      // sms reading from phone
+      {
+        ModemRequest * request = c->modemRequest(connectionId(), SMS_HANDLER_NAME, SMS_REQUEST_READ, 1);
+        SmsArgsRead * args = static_cast<SmsArgsRead*> (request->args());
+        args->smsStatus = SMS_STATUS_ALL;
+        args->smsStorage = SMS_STORAGE_PHONE;
+        c->pushRequest(request);
+      }
+
+      // sms reading from SIM
+      {
+        ModemRequest * request = c->modemRequest(connectionId(), SMS_HANDLER_NAME, SMS_REQUEST_READ, 1);
+        SmsArgsRead * args = static_cast<SmsArgsRead*> (request->args());
+        args->smsStatus = SMS_STATUS_ALL;
+        args->smsStorage = SMS_STORAGE_SIM;
+        c->pushRequest(request);
+      }
+    }
+    else
+    {
+      // remove SMS that exist in device only
+      m_totalSim = 0;
+      m_totalPhone = 0;
+      m_sourceModel->deleteSmsDevice();
+      updateCounters();
+    }
+  }
+}
+
+void SmsView::init()
+{
+  // source model
+  m_sourceModel = new SmsModel(connectionId(), this);
 
   // proxy model
   m_proxyModel = new SmsProxyModel(this);
   m_proxyModel->setSourceModel(m_sourceModel);
+  m_proxyModel->setSortRole(Qt::UserRole);
 
   ui->smsView->setModel(m_proxyModel);
 
-  ui->smsView->sortByColumn(ColumnDate, Qt::DescendingOrder);
+  ui->smsView->sortByColumn(SmsModel::ColumnDate, Qt::DescendingOrder);
 
-  connect(ui->smsView->model(), SIGNAL(modelReset()), SLOT(changeViewActionStatus()));
+  connect(m_proxyModel, SIGNAL(modelReset()), SLOT(onModelReset()), Qt::QueuedConnection);
+  connect(m_proxyModel, SIGNAL(dataChanged(QModelIndex,QModelIndex,QVector<int>)),
+          SLOT(onDataChanged(QModelIndex,QModelIndex,QVector<int>)), Qt::QueuedConnection);
+  connect(m_proxyModel, SIGNAL(rowsInserted(QModelIndex,int,int)),
+          SLOT(onRowsInserted(QModelIndex,int,int)), Qt::QueuedConnection);
+  connect(m_proxyModel, SIGNAL(rowsRemoved(QModelIndex,int,int)),
+          SLOT(onRowsRemoved(QModelIndex,int,int)), Qt::QueuedConnection);
+
   connect(ui->smsView->selectionModel(), SIGNAL(currentRowChanged(QModelIndex,QModelIndex)),
-          SLOT(changeViewActionStatus()));
+          SLOT(onSelectionChanged()), Qt::QueuedConnection);
   connect(ui->smsView->selectionModel(), SIGNAL(selectionChanged(QItemSelection,QItemSelection)),
-          SLOT(changeViewActionStatus()));
+          SLOT(onSelectionChanged()), Qt::QueuedConnection);
 
   // new sms button
   connect(ui->newSmsShowButton, SIGNAL(toggled(bool)), ui->newSmsGroupBox, SLOT(setVisible(bool)));
@@ -93,129 +867,11 @@ SmsView::SmsView(const QString& connectionId, QWidget *parent) :
     connect(m_smsReply, SIGNAL(triggered()), SLOT(onSmsReplyAction()));
     ui->replyBtn->setDefaultAction(m_smsReply);
     ui->smsView->addAction(m_smsReply);
-
-    changeViewActionStatus();
   }
-}
 
-SmsView::~SmsView()
-{
-  delete ui;
-}
-
-void SmsView::changeEvent(QEvent *e)
-{
-  QWidget::changeEvent(e);
-  switch (e->type())
-  {
-  case QEvent::LanguageChange:
-    ui->retranslateUi(this);
-    break;
-  default:
-    break;
-  }
-}
-
-void SmsView::processConnectionEvent(Core::ConnectionEvent event, const QVariant& data)
-{
-  if (event == Core::ConnectionEventCustom)
-  {
-    ModemReply* reply = data.value<ModemReply*>();
-    Q_ASSERT(reply);
-
-    if ((reply->handlerName() == SMS_HANDLER_NAME))
-    {
-      const QString errStr = tr("<ERROR>");
-
-      switch(reply->type())
-      {
-      case SMS_REQUEST_CAPACITY:
-      {
-        QString simUsed, simTotal, phoneUsed, phoneTotal;
-
-        if (reply->status())
-        {
-          SmsAnswerCapacity * answer = static_cast<SmsAnswerCapacity*> (reply->data());
-
-          simUsed  = QString::number(answer->simUsed);
-          simTotal = QString::number(answer->simTotal);
-          phoneUsed  = QString::number(answer->phoneUsed);
-          phoneTotal = QString::number(answer->phoneTotal);
-        }
-        else
-        {
-          simUsed    = errStr;
-          simTotal   = errStr;
-          phoneUsed  = errStr;
-          phoneTotal = errStr;
-        }
-
-        ui->labelSmsStorageCapacitySIMValue->setText(simUsed + QChar('/') +simTotal);
-        ui->labelSmsStorageCapacityPhoneValue->setText(phoneUsed + QChar('/') + phoneTotal);
-      }
-        break;
-      case SMS_REQUEST_READ:
-      {
-        if (reply->status())
-        {
-          SmsAnswerRead * answer = static_cast<SmsAnswerRead*> (reply->data());
-          readSms(answer->smsList);
-        }
-        else
-        {
-          // TODO: show an error message
-        }
-      }
-        break;
-      case SMS_REQUEST_DELETE:
-      {
-
-      }
-        break;
-      case SMS_REQUEST_SEND:
-      {
-
-      }
-        break;
-      default:
-        Q_LOGEX(LOG_VERBOSE_CRITICAL, "Unknown reply type received!");
-      }
-    }
-  }
-  else if (event == Core::ConnectionEventStatus)
-  {
-    bool opened = data.toBool();
-
-    if (opened)
-    {
-      Core * c = Core::instance();
-
-      // capacity request
-      c->pushRequest(c->modemRequest(connectionId(), SMS_HANDLER_NAME, SMS_REQUEST_CAPACITY, 1));
-
-      // sms reading from phone
-      {
-        ModemRequest * request = c->modemRequest(connectionId(), SMS_HANDLER_NAME, SMS_REQUEST_READ, 1);
-        SmsArgsRead * args = static_cast<SmsArgsRead*> (request->args());
-        args->smsStatus = SMS_STATUS_ALL;
-        args->smsStorage = SMS_STORAGE_PHONE;
-        c->pushRequest(request);
-      }
-
-      // sms reading from SIM
-      {
-        ModemRequest * request = c->modemRequest(connectionId(), SMS_HANDLER_NAME, SMS_REQUEST_READ, 1);
-        SmsArgsRead * args = static_cast<SmsArgsRead*> (request->args());
-        args->smsStatus = SMS_STATUS_ALL;
-        args->smsStorage = SMS_STORAGE_SIM;
-        c->pushRequest(request);
-      }
-    }
-  }
-}
-
-void SmsView::init()
-{
+  // reset view
+  retranslateUi();
+  onModelReset();
 }
 
 void SmsView::tini()
@@ -225,17 +881,13 @@ void SmsView::tini()
 
 void SmsView::restore(Settings &set)
 {
+  m_autoArchiveOnRead = set.value("autoArchiveOnRead", false).toBool();
   ui->smsView->horizontalHeader()->restoreState(set.value("smsViewHeader").toByteArray());
-
-  SmsDatabaseEntity smsDb;
-  if (smsDb.init())
-  {
-    //appendSms(smsDb.select());
-  }
 }
 
 void SmsView::store(Settings &set)
 {
+  set.setValue("autoArchiveOnRead", m_autoArchiveOnRead);
   set.setValue("smsViewHeader", ui->smsView->horizontalHeader()->saveState());
 }
 
@@ -264,7 +916,7 @@ void SmsView::smsStorageShowButtonToggle(bool checked)
   m_proxyModel->setSmsStorageShow(storage, checked);
 }
 
-void SmsView::changeViewActionStatus()
+void SmsView::onSelectionChanged()
 {
   QModelIndexList selected = ui->smsView->selectionModel()->selectedRows();
   QModelIndex current = ui->smsView->selectionModel()->currentIndex();
@@ -281,6 +933,27 @@ void SmsView::changeViewActionStatus()
   }
 
   m_smsReply->setEnabled(singleSelected);
+
+  // set selected SMS data into field
+  ui->currentSmsInfo->clear();
+  if (singleSelected)
+  {
+    int sourceRow = m_proxyModel->mapToSource(current).row();
+
+    const QString row("<b>%1 </b>%2<br>");
+    QString smsHeader = row.arg(tr("Sender:")).arg(m_sourceModel->smsSender(sourceRow)) +
+
+                        row.arg(tr("Date and Time:")).arg(m_sourceModel->smsDate(sourceRow)
+                                                          .toString(Qt::DefaultLocaleShortDate)) +
+
+                        row.arg(tr("Service center:")).arg(m_sourceModel->smsSC(sourceRow)) +
+
+                        row.arg(tr("SMS size:")).arg(QString::number(m_sourceModel->smsSizeCount(sourceRow))
+                                                     + QChar(' ') + tr("SMSes"));
+
+    ui->currentSmsInfo->appendHtml(smsHeader);
+    ui->currentSmsInfo->appendPlainText(QChar('\n') + m_sourceModel->smsText(sourceRow));
+  }
 }
 
 void SmsView::onSmsDeleteAction()
@@ -288,45 +961,36 @@ void SmsView::onSmsDeleteAction()
   QModelIndexList selected = ui->smsView->selectionModel()->selectedRows();
   QModelIndex current = ui->smsView->selectionModel()->currentIndex();
 
-  QList<QPair<SMS_STORAGE, QList<int> > > forDeletion;
-
+  QModelIndexList list;
   if (selected.size() > 1)
   {
-    qSort(selected.begin(), selected.end());
-
-    for (int i = selected.size() - 1; i>= 0; --i)
-    {
-      const QModelIndex &index = selected.at(i);
-
-      QModelIndex storageIndex = index.sibling(index.row(), ColumnStorage);
-      Q_ASSERT(storageIndex.isValid());
-
-      forDeletion.append(qMakePair((SMS_STORAGE)storageIndex.data(Qt::UserRole).toInt(),
-                                   storageIndex.data(Qt::UserRole+1).value<QList<int> >()));
-
-      QModelIndex sourceIndex = m_proxyModel->mapToSource(index);
-      Q_ASSERT(sourceIndex.isValid());
-      m_sourceModel->removeRow(sourceIndex.row());
-    }
+    list = selected;
   }
   else if (current.isValid())
   {
-    QModelIndex storageIndex = current.sibling(current.row(), ColumnStorage);
-    Q_ASSERT(storageIndex.isValid());
-
-    forDeletion.append(qMakePair((SMS_STORAGE)storageIndex.data(Qt::UserRole).toInt(),
-                                 storageIndex.data(Qt::UserRole+1).value<QList<int> >()));
-
-    QModelIndex sourceIndex = m_proxyModel->mapToSource(current);
-    Q_ASSERT(sourceIndex.isValid());
-    m_sourceModel->removeRow(sourceIndex.row());
+    list << current;
   }
   else
   {
     Q_ASSERT(false);
   }
 
-  deleteSms(forDeletion);
+  Core * c = Core::instance();
+  for (int i = list.size() - 1; i>= 0; --i)
+  {
+    QModelIndex index = m_proxyModel->mapToSource(list.at(i));
+    QList<int> smsIndices = m_sourceModel->smsIndices(index.row());
+    SMS_STORAGE smsStorage = m_sourceModel->smsStorage(index.row());
+
+    foreach(int smsIndex, smsIndices)
+    {
+      ModemRequest * request = c->modemRequest(connectionId(), SMS_HANDLER_NAME, SMS_REQUEST_DELETE, 1);
+      SmsArgsDelete * args = static_cast<SmsArgsDelete*> (request->args());
+      args->smsStorage = smsStorage;
+      args->smsIndex = smsIndex;
+      c->pushRequest(request);
+    }
+  }
 }
 
 void SmsView::onSmsReplyAction()
@@ -338,7 +1002,7 @@ void SmsView::onSmsReplyAction()
       ((!selected.size()) || ((selected.size() == 1) && (selected.at(0).row() == current.row()))))
   {
     ui->newSmsShowButton->setChecked(true);
-    ui->smsReceiver->setText(current.sibling(current.row(), ColumnNumber).data().toString());
+    ui->smsReceiver->setText(current.sibling(current.row(), SmsModel::ColumnNumber).data().toString());
     ui->smsText->setFocus();
   }
   else
@@ -347,133 +1011,80 @@ void SmsView::onSmsReplyAction()
   }
 }
 
-void SmsView::readSms(const QList<Sms>& smsList)
+void SmsView::onDataChanged(const QModelIndex& topLeft, const QModelIndex& bottomRight, const QVector<int>& roles)
 {
-  // TODO: Provide real SMS concatenation
-  QList<SmsMeta> smsMetaList;
-  foreach(const Sms& sms, smsList)
-  {
-    smsMetaList.append(SmsMeta(QList<Sms>() << sms));
-  }
+  Q_UNUSED(topLeft);
+  Q_UNUSED(bottomRight);
+  Q_UNUSED(roles);
 
-  // TODO: ???
-  //m_sourceModel->removeRows(0, m_sourceModel->rowCount());
-
-  int smsCountNew = 0;
-  int smsCountIncome = 0;
-  int smsCountDraft = 0;
-  int smsCountSent = 0;
-
-  int row = m_sourceModel->rowCount();
-  m_sourceModel->setRowCount(m_sourceModel->rowCount() + smsMetaList.size());
-  foreach(const SmsMeta& smsMeta, smsMetaList)
-  {
-    SMS_STATUS status = smsMeta.status();
-    QIcon statusIcon;
-    switch (status)
-    {
-    case SMS_STATUS_NEW:
-      ++smsCountNew;
-      statusIcon = QIcon("icons/sms_unread.png");
-      break;
-    case SMS_STATUS_INCOME:
-      ++smsCountIncome;
-      statusIcon = QIcon("icons/sms_income.png");
-      break;
-    case SMS_STATUS_DRAFT:
-      ++smsCountDraft;
-      statusIcon = QIcon("icons/sms_draft.png");
-      break;
-    case SMS_STATUS_SENT:
-      ++smsCountSent;
-      statusIcon = QIcon("icons/sms_sent.png");
-      break;
-    default:
-      Q_LOGEX(LOG_VERBOSE_CRITICAL, "Unknown status!");
-    }
-
-    QIcon storageIcon;
-    SMS_STORAGE storage = smsMeta.storage();
-    switch(storage)
-    {
-    case SMS_STORAGE_PHONE:
-      storageIcon = QIcon("icons/sms_modem.png");
-      break;
-    case SMS_STORAGE_SIM:
-      storageIcon = QIcon("icons/sms_sim.png");
-      break;
-    default:
-      Q_LOGEX(LOG_VERBOSE_CRITICAL, "Unknown storage!");
-    }
-
-    QString smsTooltip;
-    {
-      QStringList indexes;
-      foreach(int index, smsMeta.indexes())
-      {
-        indexes.append(QString::number(index));
-      }
-
-      smsTooltip =
-          tr("SMS service center: %1").arg(smsMeta.smsc()) + QString(ENDL) +
-          tr("Message contains %1 SMS(es)").arg(indexes.size());
-    }
-
-    QStandardItem * itemStorage = new QStandardItem(storageIcon, QString());
-    itemStorage->setData(storage, Qt::UserRole);
-    itemStorage->setData(QVariant::fromValue<QList<int> >(smsMeta.indexes()), Qt::UserRole+1);
-    itemStorage->setToolTip(smsTooltip);
-    m_sourceModel->setItem(row, ColumnStorage, itemStorage);
-
-    QStandardItem * itemStatus = new QStandardItem(statusIcon, QString());
-    itemStatus->setData(status, Qt::UserRole);
-    itemStatus->setToolTip(smsTooltip);
-    m_sourceModel->setItem(row, ColumnStatus, itemStatus);
-
-    QStandardItem * itemDate = new QStandardItem(smsMeta.dateTime().toString(Qt::RFC2822Date));
-    itemDate->setToolTip(smsTooltip);
-    m_sourceModel->setItem(row, ColumnDate, itemDate);
-
-    QStandardItem * itemNumber = new QStandardItem(smsMeta.sender());
-    itemNumber->setToolTip(smsTooltip);
-    m_sourceModel->setItem(row, ColumnNumber, itemNumber);
-
-    QStandardItem * itemMessage = new QStandardItem(smsMeta.userText());
-    itemMessage->setToolTip(smsTooltip);
-    m_sourceModel->setItem(row, ColumnMessage, itemMessage);
-
-    ++row;
-  }
-
-  m_proxyModel->invalidate();
-
-  ui->smsView->resizeColumnsToContents();
-
-  // set count labels
-  ui->labelSmsNewCountValue->setText(QString::number(smsCountNew));
-  ui->labelSmsIncomeCountValue->setText(QString::number(smsCountIncome));
-  ui->labelSmsDraftsCountValue->setText(QString::number(smsCountDraft));
-  ui->labelSmsSentCountValue->setText(QString::number(smsCountSent));
+  updateCounters();
 }
 
-void SmsView::deleteSms(const QList<QPair<SMS_STORAGE,QList<int> > >& msgList)
+void SmsView::onModelReset()
 {
-  Core * c = Core::instance();
-
-  typedef QPair<SMS_STORAGE,QList<int> > Msg;
-
-  foreach (const Msg& msg, msgList)
-  {
-    foreach(int index, msg.second)
-    {
-      ModemRequest * request = c->modemRequest(connectionId(), SMS_HANDLER_NAME, SMS_REQUEST_DELETE, 1);
-      SmsArgsDelete * args = static_cast<SmsArgsDelete*> (request->args());
-      args->smsStorage = msg.first;
-      args->smsIndex = index;
-      c->pushRequest(request);
-    }
-  }
+  onSelectionChanged();
+  updateCounters();
 }
+
+void SmsView::onRowsInserted(const QModelIndex& parent, int first, int last)
+{
+  Q_UNUSED(parent);
+  Q_UNUSED(first);
+  Q_UNUSED(last);
+
+  onModelReset();
+}
+
+void SmsView::onRowsRemoved(const QModelIndex& parent, int first, int last)
+{
+  Q_UNUSED(parent);
+  Q_UNUSED(first);
+  Q_UNUSED(last);
+
+  onModelReset();
+}
+
+void SmsView::updateCounters()
+{
+  // status counters
+  ui->labelSmsNewCountValue->setText(QString::number(m_sourceModel->statusCount(SMS_STATUS_NEW)));
+  ui->labelSmsIncomeCountValue->setText(QString::number(m_sourceModel->statusCount(SMS_STATUS_INCOME)));
+  ui->labelSmsDraftsCountValue->setText(QString::number(m_sourceModel->statusCount(SMS_STATUS_DRAFT)));
+  ui->labelSmsSentCountValue->setText(QString::number(m_sourceModel->statusCount(SMS_STATUS_SENT)));
+
+  // storage counters
+  ui->labelSmsStorageCapacityArchiveValue->setText(QString::number(m_sourceModel->archivedCount()));
+
+  const QString errStr(tr("<ERROR>"));
+  const QString redText("<font color=\"red\">%1</font>");
+
+#define SET_COUNTER(label, used, total) \
+  { \
+    const int criticalPercent = 75; \
+    bool critical = false; \
+    QString usedStr(QString::number(used)); \
+    QString totalStr(errStr); \
+    if (total != -1) \
+    { \
+      totalStr = QString::number(total); \
+      if (total && (used * 100 / total >= criticalPercent)) \
+      { \
+        usedStr = redText.arg(used); \
+        critical = true; \
+      } \
+    } \
+    label->setText(usedStr + QString("<b>/</b>") + totalStr); \
+    if (critical) \
+    { \
+      label->setToolTip(tr("Used capacity is above %1 percent of total storage capacity!").arg(criticalPercent)); \
+    } \
+  }
+
+  SET_COUNTER(ui->labelSmsStorageCapacitySIMValue,   m_sourceModel->storageCount(SMS_STORAGE_SIM),   m_totalSim);
+  SET_COUNTER(ui->labelSmsStorageCapacityPhoneValue, m_sourceModel->storageCount(SMS_STORAGE_PHONE), m_totalPhone);
+}
+
+
 
 
 SmsProxyModel::SmsProxyModel(QObject* parent) :
@@ -492,7 +1103,7 @@ void SmsProxyModel::setSmsStatusShow(SMS_STATUS status, bool show)
   }
   else
   {
-    Q_LOGEX(LOG_VERBOSE_CRITICAL, "Using SMS_STATUS_ALL is not allowed here!");
+    Q_ASSERT(false);
   }
 
   invalidate();
@@ -508,38 +1119,17 @@ void SmsProxyModel::setSmsStorageShow(SMS_STORAGE storage, bool show)
 
 bool SmsProxyModel::filterAcceptsRow(int source_row, const QModelIndex& source_parent) const
 {
-  if (source_parent.isValid())
-  {
-    return false;
-  }
-
-  QStandardItemModel * model = static_cast<QStandardItemModel*> (sourceModel());
+  SmsModel * model = static_cast<SmsModel*> (sourceModel());
 
   // check status
-  QModelIndex statusIndex =  model->index(source_row, SmsView::ColumnStatus);
-
-  if (!statusIndex.isValid())
-  {
-    return false;
-  }
-
-  SMS_STATUS status = (SMS_STATUS)statusIndex.data(Qt::UserRole).toInt();
-
+  SMS_STATUS status = model->smsStatus(source_row);
   if (m_statusMap.value(status, false) == false)
   {
     return false;
   }
 
   // check storage
-  QModelIndex storageIndex = model->index(source_row, SmsView::ColumnStorage);
-
-  if (!storageIndex.isValid())
-  {
-    return false;
-  }
-
-  SMS_STORAGE storage = (SMS_STORAGE)storageIndex.data(Qt::UserRole).toInt();
-
+  SMS_STORAGE storage = model->smsStorage(source_row);
   if (m_storageMap.value(storage, false) == false)
   {
     return false;
@@ -547,3 +1137,8 @@ bool SmsProxyModel::filterAcceptsRow(int source_row, const QModelIndex& source_p
 
   return QSortFilterProxyModel::filterAcceptsRow(source_row, source_parent);
 }
+
+
+
+
+

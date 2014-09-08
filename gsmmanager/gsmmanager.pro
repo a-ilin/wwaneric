@@ -23,9 +23,18 @@ LIBS += -L$$DESTDIR -lpdu -llibPdu
 
 #PRE_TARGETDEPS += $$OUT_PWD/../pdu-bin/release/libpdu.a
 
+DEFINES += LOG_ENABLED LOG_MULTITHREADING
+
+win32-msvc* {
+  # MSVC
+  # Disable C996 Warning
+  DEFINES += _CRT_SECURE_NO_WARNINGS snprintf=_snprintf
+} else {
+  # MinGW
+  QMAKE_CXXFLAGS += -std=c++0x
+}
 
 
-QMAKE_CXXFLAGS += -std=c++0x
 
 
 
@@ -92,7 +101,11 @@ OTHER_FILES += \
 
 
 # icons
-copyicons.commands = $(COPY_DIR) $$PWD/icons $$DESTDIR
+iconsDirSrc = $$PWD/icons
+iconsDirDst = $$DESTDIR/icons
+win32:iconsDirSrc = $$replace(iconsDirSrc, "/", "\\")
+win32:iconsDirDst = $$replace(iconsDirDst, "/", "\\")
+copyicons.commands = $(COPY_DIR) $$iconsDirSrc $$iconsDirDst
 first.depends = $(first) copyicons
 export(first.depends)
 export(copyicons.commands)

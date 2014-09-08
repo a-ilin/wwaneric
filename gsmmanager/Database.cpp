@@ -92,3 +92,62 @@ QSqlDatabase Database::qDatabase() const
 {
   return QSqlDatabase::database();
 }
+
+
+void prepareQueryClause(QSqlQuery * query, const QString& templ, const DatabaseKey& key, const QStringList& acceptedValues)
+{
+  QString resultString;
+
+  DatabaseKey::const_iterator iter = key.constBegin();
+  DatabaseKey::const_iterator iterEnd = key.constEnd();
+
+  // first pass, construct base query string
+  bool needAnd = false;
+  while (iter != iterEnd)
+  {
+    if ((!acceptedValues.size()) || acceptedValues.contains(iter.key()))
+    {
+      if (needAnd)
+      {
+        resultString.append(" AND ");
+      }
+
+      resultString.append(QChar(' ') + iter.key() + QString(" = :")+ iter.key() + QChar(' '));
+
+      needAnd = true;
+    }
+    else
+    {
+      Q_ASSERT(false);
+      Q_LOGEX(LOG_VERBOSE_CRITICAL, QString("Wrong DB key field: ") + iter.key())
+    }
+
+    ++iter;
+  }
+
+  if (resultString.size())
+  {
+    resultString.prepend(" WHERE ");
+  }
+
+  query->prepare(templ.arg(resultString));
+
+  iter = key.constBegin();
+
+  // second pass, bind values
+  while (iter != iterEnd)
+  {
+    if ((!acceptedValues.size()) || acceptedValues.contains(iter.key()))
+    {
+      query->bindValue(QChar(':')+iter.key(), iter.value());
+    }
+    else
+    {
+      Q_ASSERT(false);
+      Q_LOGEX(LOG_VERBOSE_CRITICAL, QString("Wrong DB key field: ") + iter.key())
+    }
+
+    ++iter;
+  }
+}
+

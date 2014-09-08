@@ -11,7 +11,9 @@
 #define PDU_SUBMIT_H
 #include "pdu_base.h"
 
-class Pdu_Submit : public Pdu_Base {
+#include "common.h"
+
+class PDU_DECODE_API Pdu_Submit : public Pdu_Base {
 public:
 	Pdu_Submit();
     

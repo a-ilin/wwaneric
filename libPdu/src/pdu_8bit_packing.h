@@ -11,10 +11,11 @@
 #ifndef _PDU_8BIT_PACKING
 #define _PDU_8BIT_PACKING
 
+#include "common.h"
+
 class Pdu_Packed;
 
-
-class Pdu_8Bit_Packing 
+class PDU_DECODE_API Pdu_8Bit_Packing
 {
     Pdu_Packed *packed_;
       

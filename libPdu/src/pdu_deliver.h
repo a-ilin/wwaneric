@@ -15,9 +15,11 @@
 #include "pdu_datacoding.h"
 #include "pdu_userdataheader.h"
 
+#include "common.h"
+
 class Pdu_User_Data;
 
-class Pdu_Deliver : public Pdu
+class PDU_DECODE_API Pdu_Deliver : public Pdu
 {
     Pdu_Address senderNumber_;
     unsigned int protocol_;
@@ -45,8 +47,7 @@ public:
     const Pdu_User_Data *getUserData ( void ) const { return userData_; }
 
     const Pdu_Address &getSenderNumber ( void ) const { return senderNumber_; }
-    const std::string &getSenderNumberAsString ( void ) const { return senderNumber_.getValue(); }
-    const char *getSenderNumberAsCStr ( void ) const { return senderNumber_.getValueAsCStr (); }
+    QString getSenderNumberAsString ( void ) const { return senderNumber_.getValue(); }
 
     const std::string getProtocolAsString ( void ) const { return cast_string  ( protocol_ ); }
     const char *getProtocolAsCStr( void ) const { return getProtocolAsString().c_str(); }

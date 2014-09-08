@@ -14,9 +14,11 @@
 
 #include <QString>
 
+#include "common.h"
+
 class Pdu_Packed;
 
-class Pdu_7Bit_Packing
+class PDU_DECODE_API Pdu_7Bit_Packing
 {
     Pdu_Packed *packed_;
 

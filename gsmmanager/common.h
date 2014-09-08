@@ -19,10 +19,6 @@
 
 #endif
 
-
-// enable logging
-#define LOG_ENABLED
-#define LOG_USE_PTHREADS
 #include "log.h"
 
 // line ending
@@ -57,7 +53,7 @@ QString hexString(const QList<QByteArray> & listData);
  * Assume that 'X' is a separator. Then:
  *
  * KeepDataOnly:   (XXabcXXXabcXabcXXabcXX) ==>        (abc)         (abc)   (abc)      (abc)
- * KeepEmptyParts: (XXabcXXXabcXabcXXabcXX) ==> () ()  (abc)  () ()  (abc)   (abc)  ()  (abc)  ()
+ * KeepEmptyParts: (XXabcXXXabcXabcXXabcXX) ==> () ()  (abc)  () ()  (abc)   (abc)  ()  (abc)  () ()
  * KeepSeparators: (XXabcXXXabcXabcXXabcXX) ==>  (X)(X)(abc)(X)(X)(X)(abc)(X)(abc)(X)(X)(abc)(X)(X)
  *
  */
@@ -74,5 +70,14 @@ QList<QByteArray> splitByteArray(const QByteArray &array,
                                  SplitByteArrayMode mode);
 
 
+/*
+ * Byte-to-byte comparison of byte arrays.
+ * Return value:
+ * 0 if arrays are the same,
+ * positive value if first's size is bigger or first non-equal byte is bigger,
+ * negative value otherwise.
+ * Note that return value does not correspond to quantity of different bytes!
+ */
+int compareByteArray(const QByteArray& first, const QByteArray& second);
 
 #endif // COMMON_H

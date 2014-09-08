@@ -1,7 +1,21 @@
-TARGET = libPdu
-TEMPLATE = lib
 QT += core
 QT -= gui
+
+TEMPLATE = lib
+
+TARGET = libPdu
+
+DEFINES += PDU_DECODE_EXPORTS
+
+win32-msvc* {
+  # MSVC
+  # Disable C996 Warning
+  DEFINES += _CRT_SECURE_NO_WARNINGS snprintf=_snprintf
+} else {
+  # MinGW
+  QMAKE_CXXFLAGS += -std=c++0x
+}
+
 
 DESTDIR = ..
 
@@ -22,7 +36,8 @@ HEADERS += \
     src/pdu_packed.h \
     src/pdu_submit.h \
     src/pdu_userdata.h \
-    src/pdu_userdataheader.h
+    src/pdu_userdataheader.h \
+    src/common.h
 
 SOURCES += \
     src/Pdu.cpp \

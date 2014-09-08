@@ -1,11 +1,8 @@
 ﻿/*
-* To enable logging put this into CPP/H files:
-* #define LOG_ENABLED
-* #include "log.h"
+* To enable logging define value LOG_ENABLED
 *
 * If you need to log from different threads/processes
-* then add this line before including log.h:
-* #define LOG_USE_PTHREADS
+* then also define this value: LOG_MULTITHREADING
 *
 * At start point call startLogging() and just before exit call stopLogging()
 *
@@ -57,11 +54,15 @@ LOG_VERBOSE validateVerbosityFromString(std::string verbosity);
 
 #ifdef LOG_ENABLED
 
-int startLogging();
-int stopLogging();
+bool startLogging();
+void stopLogging();
 
 void WriteLogEx(LOG_VERBOSE verbose, const wchar_t * position, const wchar_t * message);
 void WriteLog(const wchar_t * message);
+
+#ifdef _MSC_VER
+#define __PRETTY_FUNCTION__ __FUNCTION__
+#endif
 
 #define LOGEX(VERBOSITY,MESSAGEFMT) \
         { \
@@ -84,6 +85,7 @@ void WriteLog(const wchar_t * message);
     int _size = _str.toWCharArray(_array); \
     _array[_size] = 0; \
     LOGEX(VERBOSITY, _array); \
+    delete[] _array; \
   }
 #endif // QT_VERSION
 

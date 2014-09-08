@@ -13,7 +13,9 @@
 #include "pdu_packed.h"
 #include "pdu_address.h"
 
-class Pdu_Base : public Pdu_Packed {
+#include "common.h"
+
+class PDU_DECODE_API Pdu_Base : public Pdu_Packed {
     Pdu_Address smsc_;
     unsigned int  header_;
     

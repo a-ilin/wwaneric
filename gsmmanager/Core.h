@@ -32,7 +32,7 @@ public:
   ~Core();
 
   bool init();
-  bool tini();
+  void tini();
 
   static Core * instance() { return m_instance; }
 

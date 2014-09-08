@@ -17,10 +17,14 @@ int main(int argc, char *argv[])
 
   QApplication::setWindowIcon(QIcon(":/icons/modem.png"));
 
+#ifdef QT_DEBUG
+  a.addLibraryPath(a.applicationDirPath());
+#else
   // this needs to remove unnecessary QT_INSTALL path
   QStringList newLibraryPaths;
   newLibraryPaths << a.applicationDirPath();
   a.setLibraryPaths(newLibraryPaths);
+#endif
 
   int returnValue = 0;
 
@@ -35,10 +39,7 @@ int main(int argc, char *argv[])
     --returnValue;
   }
 
-  if (!core->tini())
-  {
-    --returnValue;
-  }
+  core->tini();
 
   if (returnValue)
   {

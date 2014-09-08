@@ -161,7 +161,9 @@ void Pdu_Packed::getAddressField ( Pdu_Address &addr, bool lengthAsOctets )
     if (lengthAsOctets == true)
     {
         addr.setLengthAsOctets ( getOctetAsInt() );
-    } else {
+    }
+    else
+    {
         addr.setLengthAsSemiOctets ( getOctetAsInt() );
     }
 
@@ -179,13 +181,16 @@ void Pdu_Packed::getAddressField ( Pdu_Address &addr, bool lengthAsOctets )
 
         getSemiOctetAsString (number, numLen);
 
-        addr.setValue ( number );
+        addr.setValue ( QString::fromStdString(number) );
 
-    } else if ( addr.getTypeOfNumber () == Pdu_Address::TN_ALPHANUMERIC )
+    }
+    else if ( addr.getTypeOfNumber () == Pdu_Address::TN_ALPHANUMERIC )
     {
         unpack ( number, numLen );
-        addr.setValue( number );
-    } else {
+        addr.setValue( QString::fromStdString(number) );
+    }
+    else
+    {
         skipSemiOctets ( numLen );
     }
 }

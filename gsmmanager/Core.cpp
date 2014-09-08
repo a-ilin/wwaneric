@@ -10,9 +10,11 @@
 
 #include <QApplication>
 #include <QDir>
+#include <QItemSelection>
 #include <QThread>
 
-#define MODEM_ID_PROPERTY "modemId"
+// QObject's property of Modem class that contains it's connection ID
+#define CONNECTION_ID_PROPERTY "connectionId"
 
 #define CHECK_METACALL_RESULT(result) \
   if (!result) \
@@ -23,7 +25,9 @@
 Core* Core::m_instance = NULL;
 
 Core::Core() :
-  m_mainWindow(NULL)
+  m_mainWindow(NULL),
+  m_modemThread(NULL),
+  m_modemThreadHelper(NULL)
 {
   Q_ASSERT(!m_instance);
   m_instance = this;
@@ -40,11 +44,9 @@ bool Core::init()
   {
     // logging
     {
-      int status = startLogging();
-      if (status)
+      if (!startLogging())
       {
-          wprintf(L"Error initializing pthread_mutex_t! pthread_mutex_init code: %d. Terminating..." ENDL, status);
-          return -1;
+          return false;
       }
       logFilePath = (appUserDirectory() + QDir::separator() + QString("gsmmanager.log")).toLocal8Bit().constData();
       logAutoFlush = true;
@@ -53,6 +55,9 @@ bool Core::init()
     }
 
     // QMetaType data types
+    qRegisterMetaType<QVector<int> >("QVector<int>");  // Qt QAbstractItemModel::dataChanged()
+    qRegisterMetaType<QItemSelection>("QItemSelection");
+
     qRegisterMetaType<Modem**>("Modem**");
     qRegisterMetaType<PortOptions>("PortOptions");
     qRegisterMetaType<ModemRequest>("ModemRequest");
@@ -103,7 +108,7 @@ bool Core::init()
   return true;
 }
 
-bool Core::tini()
+void Core::tini()
 {
   try
   {
@@ -124,10 +129,16 @@ bool Core::tini()
     }
 
     // modems thread
-    m_modemThread->quit();
-    m_modemThread->wait();
-    delete m_modemThreadHelper;
-    delete m_modemThread;
+    if (m_modemThread)
+    {
+        m_modemThread->quit();
+        m_modemThread->wait();
+        if (m_modemThreadHelper)
+        {
+            delete m_modemThreadHelper;
+        }
+        delete m_modemThread;
+    }
 
     // conversation handlers
     qDeleteAll(m_conversationHandlers);
@@ -136,21 +147,13 @@ bool Core::tini()
     DatabaseManager::deinit();
 
     // logging
-    {
-      int status = stopLogging();
-      if (status)
-      {
-          wprintf(L"Error deinitializing pthread_mutex_t! pthread_mutex_destroy code: %d. Terminating..." ENDL, status);
-          return false;
-      }
-    }
+    stopLogging();
   }
   catch(...)
   {
-    return false;
+
   }
 
-  return true;
 }
 
 void Core::createConnection(const QString& id)
@@ -187,7 +190,7 @@ void Core::removeConnection(const QString& id)
 {
   Modem * m = m_modems.value(id);
   Q_ASSERT(m);
-  Q_ASSERT(m->property(MODEM_ID_PROPERTY).toString() == id);
+  Q_ASSERT(m->property(CONNECTION_ID_PROPERTY).toString() == id);
 
   if (m)
   {
@@ -216,7 +219,7 @@ ModemRequest* Core::modemRequest(const QString& connectionId,
 {
   Modem * m = m_modems.value(connectionId);
   Q_ASSERT(m);
-  Q_ASSERT(m->property(MODEM_ID_PROPERTY).toString() == connectionId);
+  Q_ASSERT(m->property(CONNECTION_ID_PROPERTY).toString() == connectionId);
 
   ModemRequest * request = NULL;
 
@@ -233,7 +236,7 @@ void Core::onReplyReceived(ModemReply* reply)
 {
   Modem * modem = static_cast<Modem*>(sender());
   Q_ASSERT(modem);
-  QString id = modem->property(MODEM_ID_PROPERTY).toString();
+  QString id = modem->property(CONNECTION_ID_PROPERTY).toString();
   // this is should be direct connection
   emit connectionEvent(id, ConnectionEventCustom, QVariant::fromValue<ModemReply*>(reply));
   delete reply;
@@ -243,7 +246,7 @@ void Core::onConnectionStatusChanged(bool status)
 {
   Modem * modem = static_cast<Modem*>(sender());
   Q_ASSERT(modem);
-  QString id = modem->property(MODEM_ID_PROPERTY).toString();
+  QString id = modem->property(CONNECTION_ID_PROPERTY).toString();
 
   emit connectionEvent(id, ConnectionEventStatus, status);
 }
@@ -252,7 +255,7 @@ void Core::onConnectionErrorOccured(const QString error)
 {
   Modem * modem = static_cast<Modem*>(sender());
   Q_ASSERT(modem);
-  QString id = modem->property(MODEM_ID_PROPERTY).toString();
+  QString id = modem->property(CONNECTION_ID_PROPERTY).toString();
   emit connectionEvent(id, ConnectionEventError, error);
 }
 
@@ -269,7 +272,7 @@ void Core::openConnection(const QString& id, const QString& portName, const Port
 {
   Modem * m = m_modems.value(id);
   Q_ASSERT(m);
-  Q_ASSERT(m->property(MODEM_ID_PROPERTY).toString() == id);
+  Q_ASSERT(m->property(CONNECTION_ID_PROPERTY).toString() == id);
 
   if (m)
   {
@@ -294,7 +297,7 @@ void Core::closeConnection(const QString& id)
 {
   Modem * m = m_modems.value(id);
   Q_ASSERT(m);
-  Q_ASSERT(m->property(MODEM_ID_PROPERTY).toString() == id);
+  Q_ASSERT(m->property(CONNECTION_ID_PROPERTY).toString() == id);
 
   if (m)
   {
@@ -317,7 +320,7 @@ void Core::restoreSettings()
 void ModemThreadHelper::createModem(Modem** modem, const QString& id)
 {
   (*modem) = new Modem();
-  (*modem)->setProperty(MODEM_ID_PROPERTY, id);
+  (*modem)->setProperty(CONNECTION_ID_PROPERTY, id);
 }
 
 void ModemThreadHelper::deleteModem(Modem** modem)

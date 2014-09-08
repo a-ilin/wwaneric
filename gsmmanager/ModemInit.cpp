@@ -2,8 +2,10 @@
 
 
 #define CMD_CHARACTER_SET      "AT+CSCS=\"UTF-8\""
+#define CMD_MESSAGE_INDICATION "AT+CNMI=2,1,2,1,0"
+#define CMD_AT                 "AT"
 
-#define LAST_INIT_STAGE 0
+#define LAST_INIT_STAGE 1
 
 
 void InitConversationHandler::processConversation(ModemRequest *request,
@@ -33,6 +35,13 @@ void InitConversationHandler::processConversation(ModemRequest *request,
         status = ModemRequest::SuccessCompleted;
       }
     }
+    else if (requestType == INIT_REQUEST_PING)
+    {
+      if (request->stage() == 0)
+      {
+        status = ModemRequest::SuccessCompleted;
+      }
+    }
   }
 }
 
@@ -49,6 +58,17 @@ QByteArray InitConversationHandler::requestData(const ModemRequest *request) con
     if (requestStage == 0)
     {
       data = CMD_CHARACTER_SET;
+    }
+    else if (requestStage == 1)
+    {
+      data = CMD_MESSAGE_INDICATION;
+    }
+  }
+  else if (requestType == INIT_REQUEST_PING)
+  {
+    if (requestStage == 0)
+    {
+      data = CMD_AT;
     }
   }
 

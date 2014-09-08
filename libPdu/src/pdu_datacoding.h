@@ -13,7 +13,9 @@
 #include <sys/types.h>
 #include "caststring.h"
 
-class Pdu_Data_Coding {
+#include "common.h"
+
+class PDU_DECODE_API Pdu_Data_Coding {
   
     unsigned int dataCoding_;
     

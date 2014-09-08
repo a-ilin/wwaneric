@@ -18,6 +18,7 @@ enum SMS_STORAGE
 
 bool checkSmsStorage(int storage);
 QString smsStorageStr(SMS_STORAGE storage);
+SMS_STORAGE strToSmsStorage(const QString &str);
 
 enum SMS_STATUS
 {
@@ -30,11 +31,25 @@ enum SMS_STATUS
 
 bool checkSmsStatus(int status);
 
+struct SmsBase
+{
+  // connection associated with the SMS
+  QString connectionId;
+  // storage type
+  SMS_STORAGE storage;
+  // SMS status
+  SMS_STATUS status;
+  // PDU raw data
+  QByteArray rawData;
+};
 
 struct Sms
 {
   Sms();
-  Sms(SMS_STORAGE storage, int index, SMS_STATUS status, const QByteArray &rawData);
+  Sms(SMS_STORAGE storage,
+      int index,
+      SMS_STATUS status,
+      const QByteArray &rawData);
 
   // is this sms valid
   bool valid;
@@ -55,14 +70,15 @@ struct Sms
   // if there was a PDU parsing error this will not be empty
   QString parseError;
 
-  QString udhType;
-  QByteArray udhData;
+  // concatenation
+  uint concatReference;
+  uint concatTotalCount;
+  uint concatPartNumber;
 
   // PDU raw data
   QByteArray rawData;
 };
 
-//Q_DECLARE_METATYPE(Sms)
 
 
 class SmsMeta
@@ -81,6 +97,7 @@ public:
   QString sender() const { return m_sender; }
   QString smsc() const { return m_smsc; }
 
+  QList<QByteArray> pduList() const { return m_pduList; }
 
 protected:
 
@@ -109,12 +126,10 @@ protected:
 
 };
 
-//Q_DECLARE_METATYPE(SmsMeta)
 
 
 
-
-class SmsDatabaseEntity : public IDatabaseEntity<Sms>
+class SmsDatabaseEntity : public IDatabaseEntity<SmsBase>
 {
 public:
   SmsDatabaseEntity() :
@@ -128,11 +143,11 @@ protected:
 
   QSqlQuery querySelect(Database *db, const DatabaseKey &key) const;
 
-  Sms createFromSelect(const QList<QVariant> &values) const;
+  SmsBase createFromSelect(const QList<QVariant> &values) const;
 
-  QSqlQuery queryInsert(Database *db, const Sms &value) const;
+  QSqlQuery queryInsert(Database *db, const SmsBase &value) const;
 
-  QSqlQuery queryUpdat(Database *db, const DatabaseKey &key, const Sms &value) const;
+  QSqlQuery queryUpdat(Database *db, const DatabaseKey &key, const SmsBase &value) const;
 
   QSqlQuery queryDelet(Database *db, const DatabaseKey &key) const;
 };

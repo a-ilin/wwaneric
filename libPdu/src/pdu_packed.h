@@ -14,9 +14,11 @@
 #include "pdu_7bit_packing.h"
 #include "pdu_8bit_packing.h"
 
+#include "common.h"
+
 class Pdu_Address;
 
-class Pdu_Packed : public Pdu_7Bit_Packing, public Pdu_8Bit_Packing {
+class PDU_DECODE_API Pdu_Packed : public Pdu_7Bit_Packing, public Pdu_8Bit_Packing {
 
     std::string packed_;
     unsigned int current_;

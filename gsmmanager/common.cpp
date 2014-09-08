@@ -106,3 +106,21 @@ QString hexString(const QList<QByteArray>& listData)
   }
   return str;
 }
+
+
+int compareByteArray(const QByteArray& first, const QByteArray& second)
+{
+  if (first.size() < second.size())
+  {
+    return -1;
+  }
+  else if (first.size() == second.size())
+  {
+    const char* firstData = first.constData();
+    const char* secondData = second.constData();
+
+    return memcmp(firstData, secondData, first.size());
+  }
+
+  return 1;
+}

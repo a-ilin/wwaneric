@@ -104,10 +104,10 @@ public:
 
   // processes conversation (answer) for specified request
   // Args:
-  // request [in, out] - current request in queue (can be modified in this method)
-  // c [in] - modem answer
-  // status [out] - set to corresponding status after request processing
-  // answerData [out] - pointer that must be initialized by answer data or set to NULL
+  // [in, out] request    - current request in queue (can be modified in this method)
+  // [in]      c          - modem answer
+  // [out]     status     - set to corresponding status after request processing
+  // [out]     answerData - pointer that must be initialized by answer data or set to NULL
   virtual void processConversation(ModemRequest *request,
                                    const Conversation &c,
                                    ModemRequest::Status &status,
@@ -122,9 +122,9 @@ public:
   // processes unexpected data from modem
   // if request processed successful should return true, otherwise false
   // Args:
-  // data [in] - data received by modem
-  // replyType [out] - should set to reply type if can recognize the data
-  // answerData [out] - pointer that must be initialized by answer data or set to NULL
+  // [in]  data       - data received by modem
+  // [out] replyType  - should set to reply type if can recognize the data
+  // [out] answerData - pointer that must be initialized by answer data or set to NULL
   virtual bool processUnexpectedData(const QByteArray& data,
                                      int &replyType,
                                      AnswerData* &answerData) const
@@ -194,6 +194,7 @@ protected:
 
 protected slots:
   void onInitTimeout();
+  void onPingTimeout();
 
 private:
   QLinkedList<ModemRequest*> m_requests;
@@ -209,6 +210,9 @@ private:
   InitConversationHandler * m_initHandler;
   // init timeout timer
   QTimer * m_initTimer;
+  // timer checks modem availability
+  QTimer * m_pingTimer;
+  bool m_pingReceived;
 
   mutable QReadWriteLock m_rwlock;
 

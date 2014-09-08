@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>665</width>
-    <height>391</height>
+    <height>556</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -18,6 +18,57 @@
     <layout class="QHBoxLayout" name="horizontalLayout">
      <item>
       <layout class="QGridLayout" name="gridLayout_2">
+       <item row="1" column="2">
+        <widget class="QGroupBox" name="gbSmsStorageCapacity">
+         <property name="title">
+          <string>Storage capacity</string>
+         </property>
+         <layout class="QFormLayout" name="formLayout_3">
+          <item row="0" column="0">
+           <widget class="QLabel" name="labelSmsStorageCapacitySIM">
+            <property name="text">
+             <string>SIM (used/total):</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QLabel" name="labelSmsStorageCapacitySIMValue">
+            <property name="text">
+             <string>0/0</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="labelSmsStorageCapacityModem">
+            <property name="text">
+             <string>Modem (used/total):</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QLabel" name="labelSmsStorageCapacityPhoneValue">
+            <property name="text">
+             <string>0/0</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="0">
+           <widget class="QLabel" name="labelSmsStorageCapacityArchive">
+            <property name="text">
+             <string>Local archive:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <widget class="QLabel" name="labelSmsStorageCapacityArchiveValue">
+            <property name="text">
+             <string>0</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
        <item row="2" column="0" colspan="3">
         <widget class="QToolButton" name="newSmsShowButton">
          <property name="text">
@@ -42,71 +93,6 @@
          <property name="toolButtonStyle">
           <enum>Qt::ToolButtonTextBesideIcon</enum>
          </property>
-        </widget>
-       </item>
-       <item row="1" column="0" colspan="2">
-        <widget class="QGroupBox" name="gbSmsCount">
-         <property name="title">
-          <string>SMS count</string>
-         </property>
-         <layout class="QFormLayout" name="formLayout_2">
-          <item row="0" column="0">
-           <widget class="QLabel" name="labelSmsNewCount">
-            <property name="text">
-             <string>New:</string>
-            </property>
-           </widget>
-          </item>
-          <item row="0" column="1">
-           <widget class="QLabel" name="labelSmsNewCountValue">
-            <property name="text">
-             <string>0</string>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="0">
-           <widget class="QLabel" name="labelSmsIncomeCount">
-            <property name="text">
-             <string>Income:</string>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="1">
-           <widget class="QLabel" name="labelSmsIncomeCountValue">
-            <property name="text">
-             <string>0</string>
-            </property>
-           </widget>
-          </item>
-          <item row="2" column="0">
-           <widget class="QLabel" name="labelSmsDraftsCount">
-            <property name="text">
-             <string>Drafts:</string>
-            </property>
-           </widget>
-          </item>
-          <item row="2" column="1">
-           <widget class="QLabel" name="labelSmsDraftsCountValue">
-            <property name="text">
-             <string>0</string>
-            </property>
-           </widget>
-          </item>
-          <item row="3" column="0">
-           <widget class="QLabel" name="labelSmsSentCount">
-            <property name="text">
-             <string>Sent:</string>
-            </property>
-           </widget>
-          </item>
-          <item row="3" column="1">
-           <widget class="QLabel" name="labelSmsSentCountValue">
-            <property name="text">
-             <string>0</string>
-            </property>
-           </widget>
-          </item>
-         </layout>
         </widget>
        </item>
        <item row="0" column="0" colspan="3">
@@ -285,47 +271,95 @@
          </item>
         </layout>
        </item>
-       <item row="1" column="2">
-        <widget class="QGroupBox" name="gbSmsStorageCapacity">
+       <item row="1" column="0" colspan="2">
+        <widget class="QGroupBox" name="gbSmsCount">
          <property name="title">
-          <string>Storage capacity</string>
+          <string>SMS count</string>
          </property>
-         <layout class="QFormLayout" name="formLayout_3">
+         <layout class="QFormLayout" name="formLayout_2">
           <item row="0" column="0">
-           <widget class="QLabel" name="labelSmsStorageCapacitySIM">
+           <widget class="QLabel" name="labelSmsNewCount">
             <property name="text">
-             <string>SIM (used/total):</string>
+             <string>New:</string>
             </property>
            </widget>
           </item>
           <item row="0" column="1">
-           <widget class="QLabel" name="labelSmsStorageCapacitySIMValue">
+           <widget class="QLabel" name="labelSmsNewCountValue">
             <property name="text">
-             <string>0/0</string>
+             <string>0</string>
             </property>
            </widget>
           </item>
           <item row="1" column="0">
-           <widget class="QLabel" name="labelSmsStorageCapacityModem">
+           <widget class="QLabel" name="labelSmsIncomeCount">
             <property name="text">
-             <string>Modem (used/total):</string>
+             <string>Income:</string>
             </property>
            </widget>
           </item>
           <item row="1" column="1">
-           <widget class="QLabel" name="labelSmsStorageCapacityPhoneValue">
+           <widget class="QLabel" name="labelSmsIncomeCountValue">
             <property name="text">
-             <string>0/0</string>
+             <string>0</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="0">
+           <widget class="QLabel" name="labelSmsDraftsCount">
+            <property name="text">
+             <string>Drafts:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <widget class="QLabel" name="labelSmsDraftsCountValue">
+            <property name="text">
+             <string>0</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="0">
+           <widget class="QLabel" name="labelSmsSentCount">
+            <property name="text">
+             <string>Sent:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="1">
+           <widget class="QLabel" name="labelSmsSentCountValue">
+            <property name="text">
+             <string>0</string>
             </property>
            </widget>
           </item>
          </layout>
         </widget>
        </item>
+       <item row="5" column="0" colspan="3">
+        <widget class="QPlainTextEdit" name="currentSmsInfo">
+         <property name="readOnly">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item row="4" column="0" colspan="3">
+        <widget class="QLabel" name="currentSmsInfoLabel">
+         <property name="text">
+          <string>Selected SMS</string>
+         </property>
+         <property name="alignment">
+          <set>Qt::AlignCenter</set>
+         </property>
+        </widget>
+       </item>
        <item row="3" column="0" colspan="3">
         <spacer name="verticalSpacer">
          <property name="orientation">
           <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeType">
+          <enum>QSizePolicy::Fixed</enum>
          </property>
          <property name="sizeHint" stdset="0">
           <size>
@@ -350,6 +384,9 @@
         <widget class="QTableView" name="smsView">
          <property name="contextMenuPolicy">
           <enum>Qt::ActionsContextMenu</enum>
+         </property>
+         <property name="sizeAdjustPolicy">
+          <enum>QAbstractScrollArea::AdjustToContents</enum>
          </property>
          <property name="editTriggers">
           <set>QAbstractItemView::NoEditTriggers</set>
@@ -583,6 +620,24 @@
    </item>
   </layout>
  </widget>
+ <tabstops>
+  <tabstop>showFromModem</tabstop>
+  <tabstop>showFromSim</tabstop>
+  <tabstop>showUnread</tabstop>
+  <tabstop>showIncome</tabstop>
+  <tabstop>showDrafts</tabstop>
+  <tabstop>showSent</tabstop>
+  <tabstop>deleteBtn</tabstop>
+  <tabstop>replyBtn</tabstop>
+  <tabstop>copyToArchiveBtn</tabstop>
+  <tabstop>moveToArchiveBtn</tabstop>
+  <tabstop>smsView</tabstop>
+  <tabstop>newSmsShowButton</tabstop>
+  <tabstop>smsReceiver</tabstop>
+  <tabstop>smsText</tabstop>
+  <tabstop>sendSms</tabstop>
+  <tabstop>storeSms</tabstop>
+ </tabstops>
  <resources/>
  <connections/>
 </ui>

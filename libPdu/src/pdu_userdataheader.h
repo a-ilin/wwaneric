@@ -14,12 +14,14 @@
 
 #include "caststring.h"
 
+#include "common.h"
+
 class Pdu_Packed;
 
 /**
 *      Abstraction of a  user data header
  */
-class Pdu_User_Data_Header
+class PDU_DECODE_API Pdu_User_Data_Header
 {
     unsigned int identifier_;
     unsigned int length_;
@@ -30,10 +32,18 @@ protected:
 
 public:
 
-    enum { IEI_CONCATENATED = 0, IEI_SPECIAL = 1, IEI_RESERVED = 2,
-           IEI_LF = 3, IEI_PORT8BIT = 4, IEI_PORT16BIT = 5,
-           IEI_SMSC = 6, IEI_UDH_SOURCE = 7, IEI_CONCATENATED_16BIT = 8,
-           IEI_CONTROL = 9
+    enum
+    {
+      IEI_CONCATENATED = 0,
+      IEI_SPECIAL      = 1,
+      IEI_RESERVED     = 2,
+      IEI_LF           = 3,
+      IEI_PORT8BIT     = 4,
+      IEI_PORT16BIT    = 5,
+      IEI_SMSC         = 6,
+      IEI_UDH_SOURCE   = 7,
+      IEI_CONCATENATED_16BIT = 8,
+      IEI_CONTROL      = 9
     };
 
     virtual ~Pdu_User_Data_Header ( );
@@ -50,15 +60,21 @@ public:
 /**
  *      Abstraction of a concatenated message user data header
  */
-class Pdu_Concatenated : public Pdu_User_Data_Header
+class PDU_DECODE_API Pdu_Concatenated : public Pdu_User_Data_Header
 {
     unsigned int ref_;
     unsigned int max_;
     unsigned int seq_;
+
+    bool _16bit_;
+
     Pdu_Concatenated( ) {}
 
 public:
-    Pdu_Concatenated ( unsigned int identifier, unsigned int length ) : Pdu_User_Data_Header  (  identifier, length ) {}
+    Pdu_Concatenated ( unsigned int identifier, unsigned int length, bool _16bit ) :
+      Pdu_User_Data_Header  (  identifier, length ),
+      _16bit_(_16bit)
+    {}
 
     void decode ( Pdu_Packed *packed );
     void dump ( void ) const;

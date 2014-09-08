@@ -1,4 +1,4 @@
-/*
+﻿/*
  *  pdu_userdataheader.cpp
  *  libPDU
  *
@@ -23,9 +23,9 @@ Pdu_User_Data_Header::~Pdu_User_Data_Header ( )
 /**  A default decoder for unknown or unhandled blocks.
  *
  */
-void Pdu_User_Data_Header::decode ( Pdu_Packed *packed ) 
-{ 
-    packed->skipOctets ( length_ ); 
+void Pdu_User_Data_Header::decode ( Pdu_Packed *packed )
+{
+    packed->skipOctets ( length_ );
 }
 
 void Pdu_User_Data_Header::dump ( void ) const
@@ -39,22 +39,23 @@ void Pdu_User_Data_Header::dump ( void ) const
  */
 Pdu_User_Data_Header *Pdu_User_Data_Header::create ( Pdu_Packed *packed )
 {
-    
+
     unsigned int identifier = packed->getOctetAsInt ();
     unsigned int length = packed->getOctetAsInt ();
 
-    
+
     Pdu_User_Data_Header *header = NULL;
-    
-    if ( identifier == IEI_CONCATENATED )
+
+    switch(identifier)
     {
-        header = new Pdu_Concatenated ( identifier, length );
+    case IEI_CONCATENATED:
+    case IEI_CONCATENATED_16BIT:
+      header = new Pdu_Concatenated ( identifier, length, identifier == IEI_CONCATENATED_16BIT );
+      break;
+    default:
+      header = new Pdu_User_Data_Header ( identifier, length );
     }
-    else
-    {
-        header = new Pdu_User_Data_Header ( identifier, length );
-    }
-    
+
     header->decode( packed ); // grab the body
 
     return header;
@@ -67,6 +68,12 @@ Pdu_User_Data_Header *Pdu_User_Data_Header::create ( Pdu_Packed *packed )
 void Pdu_Concatenated::decode ( Pdu_Packed *packed )
 {
     ref_ = packed->getOctetAsInt ();
+
+    if (_16bit_)
+    {
+      ref_ = (ref_ << 8) + packed->getOctetAsInt ();
+    }
+
     max_ = packed->getOctetAsInt ();
     seq_ = packed->getOctetAsInt ();
 }

@@ -3,6 +3,7 @@
 #define CMD_SMS_STORAGE_CAPACITY        "AT+CPMS?"
 #define CMD_SMS_SET_PREFERRED_STORAGE   "AT+CPMS=%1"
 #define CMD_SMS_READ_BY_STATUS          "AT+CMGL=%1"
+#define CMD_SMS_READ_BY_INDEX           "AT+CMGR=%1"
 #define CMD_SMS_DELETE_BY_INDEX         "AT+CMGD=%1,0"
 
 void SmsConversationHandler::processConversation(ModemRequest *request,
@@ -125,18 +126,78 @@ void SmsConversationHandler::processConversation(ModemRequest *request,
           }
         }
 
-        if (answerDecoded == false)
-        {
-          // reset stage to initial
-          request->setStage(0);
-          Q_LOGEX(LOG_VERBOSE_ERROR, "Error processing SMS answer!");
-        }
-        else
+        if (answerDecoded)
         {
           SmsAnswerRead * answer = new SmsAnswerRead();
           answer->smsList = smsList;
           answerData = answer;
           status = ModemRequest::SuccessCompleted;
+        }
+        else
+        {
+          // reset stage to initial
+          request->setStage(0);
+          Q_LOGEX(LOG_VERBOSE_ERROR, "Error processing SMS answer!");
+        }
+      }
+    }
+    else if ((request->type() == SMS_REQUEST_READ_BY_INDEX) && (c.data.size() > 0))
+    {
+      const SmsArgsReadByIndex* smsArgs = static_cast<SmsArgsReadByIndex*> (request->args());
+
+      // set preferred storage
+      if (request->stage() == 0)
+      {
+        request->setStage(1);
+        status = ModemRequest::SuccessNeedMoreData;
+      }
+      // read SMS
+      else if (request->stage() == 1)
+      {
+        Sms smsResult;
+        int answerDecoded = true;
+        if (c.data.size() == 2)
+        {
+          QStringList headerLine = parseAnswerLine(c.data.at(0), "+CMGR:");
+
+          // header has 3 fields
+          if (headerLine.size() == 3)
+          {
+            SAFE_CONVERT(int, toInt, msgStatus, headerLine.at(0), answerDecoded=false;);
+            // field at index 1 is 'alpha' and not used
+            // field at index 2 is octet count and not used
+
+            QByteArray pdu = c.data.at(1);
+
+            Sms sms(smsArgs->smsStorage, smsArgs->smsIndex, (SMS_STATUS)msgStatus, pdu);
+
+            if (sms.valid)
+            {
+              smsResult = sms;
+            }
+            else
+            {
+              answerDecoded = false;
+            }
+          }
+        }
+        else
+        {
+          answerDecoded = false;
+        }
+
+        if (answerDecoded)
+        {
+          SmsAnswerReadByIndex * answer = new SmsAnswerReadByIndex();
+          answer->sms = smsResult;
+          answerData = answer;
+          status = ModemRequest::SuccessCompleted;
+        }
+        else
+        {
+          // reset stage to initial
+          request->setStage(0);
+          Q_LOGEX(LOG_VERBOSE_ERROR, "Error processing SMS answer!");
         }
       }
     }
@@ -193,6 +254,25 @@ QByteArray SmsConversationHandler::requestData(const ModemRequest *request) cons
       Q_LOGEX(LOG_VERBOSE_CRITICAL, "Wrong stage!")
     }
   }
+  else if (requestType == SMS_REQUEST_READ_BY_INDEX)
+  {
+    const SmsArgsReadByIndex *smsArgs = static_cast<const SmsArgsReadByIndex*> (request->args());
+
+    if (requestStage == 0)
+    {
+      data = QString(CMD_SMS_SET_PREFERRED_STORAGE)
+             .arg(smsStorageStr(smsArgs->smsStorage)).toLatin1();
+    }
+    else if (requestStage == 1)
+    {
+      data = QString(CMD_SMS_READ_BY_INDEX)
+             .arg(smsArgs->smsIndex).toLatin1();
+    }
+    else
+    {
+      Q_LOGEX(LOG_VERBOSE_CRITICAL, "Wrong stage!")
+    }
+  }
   else if (requestType == SMS_REQUEST_DELETE)
   {
     const SmsArgsDelete *smsArgs = static_cast<const SmsArgsDelete*> (request->args());
@@ -232,9 +312,62 @@ RequestArgs* SmsConversationHandler::requestArgs(int type) const
   {
   case SMS_REQUEST_READ:
     return new SmsArgsRead();
+  case SMS_REQUEST_READ_BY_INDEX:
+    return new SmsArgsReadByIndex();
   case SMS_REQUEST_DELETE:
     return new SmsArgsDelete();
   default:
     return NULL;
   }
 }
+
+bool SmsConversationHandler::processUnexpectedData(const QByteArray& data,
+                                                    int &replyType,
+                                                    AnswerData* &answerData) const
+{
+  // check for new SMS indication
+  QStringList headerLine = parseAnswerLine(QString(data), "+CMTI:");
+
+  if(headerLine.size() == 2)
+  {
+    bool decoded = false;
+    int index;
+    SMS_STORAGE storage;
+
+    do
+    {
+      storage = strToSmsStorage(headerLine.at(0));
+      if (storage == -1)
+      {
+        break;
+      }
+
+      SAFE_CONVERT(int, toInt, i2, headerLine.at(1), break;);
+      index = i2;
+
+      decoded = true;
+    }
+    while(0);
+
+    if (decoded)
+    {
+      SmsAnswerReadUnexpected * answer = new SmsAnswerReadUnexpected();
+      answer->smsStorage = storage;
+      answer->smsIndex = index;
+
+      replyType = SMS_REQUEST_READ_UNEXPECTED;
+      answerData = answer;
+
+      return true;
+    }
+    else
+    {
+      QString err = QString("Wrong message indication received: %1").arg(QString(data));
+      Q_LOGEX(LOG_VERBOSE_ERROR, err);
+    }
+  }
+
+  return false;
+}
+
+

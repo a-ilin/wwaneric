@@ -183,67 +183,15 @@ QSqlQuery UssdDatabaseEntity::queryUpdat(Database *db, const DatabaseKey &key, c
 
 QSqlQuery UssdDatabaseEntity::queryDelet(Database *db, const DatabaseKey &key) const
 {
-  QString resultString =
+  QString queryString =
       "DELETE "
       "FROM ussd";
-
-  if (key.isEmpty())
-  {
-    QSqlQuery query(resultString, db->qDatabase());
-    return query;
-  }
-
-  resultString.append(" WHERE ");
 
   QStringList acceptedValues;
   acceptedValues << "a_ussd";
 
-  bool needAnd = false;
-
-  DatabaseKey::const_iterator iter = key.constBegin();
-  DatabaseKey::const_iterator iterEnd = key.constEnd();
-
-  // first pass, construct base query string
-  while (iter != iterEnd)
-  {
-    if (acceptedValues.contains(iter.key()))
-    {
-      if (needAnd)
-      {
-        resultString.append(" AND ");
-      }
-
-      resultString.append(QChar(' ') + iter.key() + QString(" = :")+ iter.key() + QChar(' '));
-
-      needAnd = true;
-    }
-    else
-    {
-      Q_ASSERT(false);
-    }
-
-    ++iter;
-  }
-
   QSqlQuery query(db->qDatabase());
-  query.prepare(resultString);
-
-  iter = key.constBegin();
-
-  // second pass, bind values
-  while (iter != iterEnd)
-  {
-    if (acceptedValues.contains(iter.key()))
-    {
-      query.bindValue(QChar(':')+iter.key(), iter.value());
-    }
-    else
-    {
-      Q_ASSERT(false);
-    }
-
-    ++iter;
-  }
+  prepareQueryClause(&query, queryString, key, acceptedValues);
 
   return query;
 }

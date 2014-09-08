@@ -192,4 +192,14 @@ protected:
   virtual QSqlQuery queryDelet(Database *db, const DatabaseKey &key) const = 0;
 };
 
+
+
+// Prepares query to execution
+// templ          - query string template. Should contain placeholder '%1' clause will be placed to
+// key            - key with values used to construct clause
+// acceptedValues - list of accepted key values. Used if not empty.
+void prepareQueryClause(QSqlQuery * query, const QString& templ, const DatabaseKey& key, const QStringList& acceptedValues = QStringList());
+
+
+
 #endif // DATABASE_H

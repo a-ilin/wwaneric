@@ -173,7 +173,6 @@ void PortController::closePort()
 
   if (m_serialPort->isOpen())
   {
-    // TODO: Should device be cleared before close?
     m_serialPort->clear();
     m_serialPort->close();
   }
@@ -342,7 +341,7 @@ bool PortController::parseBuffer()
       m_bufferReceived.clear();
     }
   }
-  else
+  else // PORT_CONTROLLER_STATUS_PROCESS_REQUEST
   {
     int restSize = 0;
     const QList<Conversation> conversations = parse(m_bufferReceived, restSize);
@@ -374,22 +373,7 @@ bool PortController::parseBuffer()
         }
       }
 
-      if ((c.request == "*EMRDY: 1") || (c.request == "AT"))
-      {
-        if (c.status == Conversation::OK)
-        {
-          if (m_modemDetected)
-          {
-            Q_LOGEX(LOG_VERBOSE_WARNING, "Received READY while modem was already detected.");
-          }
-
-          m_portControllerStatus = PORT_CONTROLLER_STATUS_READY;
-
-          m_modemDetected = true;
-          modemDetected(true);
-        }
-      }
-      else if (m_modemDetected)
+      if (m_modemDetected)
       {
         if (processConversation(c))
         {
@@ -398,9 +382,22 @@ bool PortController::parseBuffer()
       }
       else
       {
-        QString err = QString("Received request %1 but modem was not detected!")
-                      .arg(QString(c.request));
-        Q_LOGEX(LOG_VERBOSE_ERROR, err);
+        if ((c.request == "*EMRDY: 1") || (c.request == "AT"))
+        {
+          if (c.status == Conversation::OK)
+          {
+            m_portControllerStatus = PORT_CONTROLLER_STATUS_READY;
+
+            m_modemDetected = true;
+            modemDetected(true);
+          }
+        }
+        else
+        {
+          QString err = QString("Received request %1 but modem was not detected!")
+                        .arg(QString(c.request));
+          Q_LOGEX(LOG_VERBOSE_ERROR, err);
+        }
       }
     }
   }
