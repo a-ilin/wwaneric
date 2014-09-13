@@ -18,12 +18,17 @@ QStringList parseAnswerLine(const QString &line, const QString &command)
 {
   // check for command
   int index = line.indexOf(command);
-  if(index != 0)  // line should starts with the command
+
+  // line should starts with the command
+  for (int i=0; i < index; ++i)
   {
-    return QStringList();
+    if (!line[i].isSpace())
+    {
+      return QStringList();
+    }
   }
 
-  index = command.size();
+  index += command.size();
   while((index < line.size()) && (line.at(index) == ' '))
   {
     ++index;
@@ -281,7 +286,7 @@ void Modem::appendRequest(ModemRequest *request)
   sendRequest();
 }
 
-bool Modem::processConversation(const Conversation &c)
+bool Modem::processConversation(Conversation c)
 {
   if (!m_requests.size())
   {
@@ -296,6 +301,25 @@ bool Modem::processConversation(const Conversation &c)
 
   ModemRequest * request = m_requests.first();
 
+  // If there was an unexpected reply between port I/O
+  // data field must be checked too
+  QByteArray unexpectedData;
+  while ((requestData() != c.request) && (c.data.size() > 0))
+  {
+    unexpectedData += c.request + phraseSep;
+    c.request = c.data.takeFirst();
+  }
+
+  if ( ! unexpectedData.isEmpty())
+  {
+    if ( ! processUnexpectedData(unexpectedData))
+    {
+      QString strErr("Unexpected data collision solving failed!");
+      Q_LOGEX(LOG_VERBOSE_ERROR, strErr);
+    }
+  }
+
+  // try to process conversation
   if (requestData() == c.request)
   {
     QReadLocker locker(&m_rwlock);
@@ -426,7 +450,8 @@ bool Modem::processUnexpectedData(const QByteArray& data)
 
   while((iter != m_conversationHandlers.constEnd()) && (!result))
   {
-    result = iter.value()->processUnexpectedData(data, replyType, answer);
+    handler = iter.value();
+    result = handler->processUnexpectedData(data, replyType, answer);
 
     ++iter;
   }

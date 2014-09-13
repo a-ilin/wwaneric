@@ -9,10 +9,10 @@
 class QSerialPort;
 class QTimer;
 
+const QByteArray phraseSep("\r\n");
+
 // first line of Conversation has request itself
 // last line of Conversation has status: OK/ERROR
-//typedef QList<QByteArray> Conversation;
-
 struct Conversation
 {
   enum STATUS
@@ -88,7 +88,7 @@ signals:
 
 protected:
   // return true if conversation was recognized and successfully processed
-  virtual bool processConversation(const Conversation & c) = 0;
+  virtual bool processConversation(Conversation c) = 0;
   // return true if unexpected modem data has been processed
   virtual bool processUnexpectedData(const QByteArray& data) = 0;
   // return raw data for request from queue

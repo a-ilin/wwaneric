@@ -10,7 +10,6 @@ const QString statusError("ERROR");
 QList<Conversation> parse(const QByteArray &answer, int &unparsedRestSize)
 {
   // split by \r\n
-  const QByteArray phraseSep("\r\n");
   QList<QByteArray> splitted = splitByteArray(answer, phraseSep, KeepSeparators);
 
   QList<Conversation> conversations;
@@ -205,7 +204,7 @@ void PortController::onReadyRead()
     Q_LOGEX(LOG_VERBOSE_DEBUG, debugString);
   }
 
-  if (!parseBuffer())
+  if ( ! parseBuffer())
   {
     m_timerTimeout->start();
   }
@@ -215,8 +214,8 @@ void PortController::onReadyRead()
     {
       if (m_bufferReceived.size() > 0)
       {
-        QString str = QString("Answer processed but unneeded data found. Clearing buffer. Data: ")
-                      .arg(QString(m_bufferReceived));
+        QString str = QString("Answer processed but unneeded data found. Clearing buffer." ENDL " HEX: ") +
+                      hexString(m_bufferReceived) + QString(ENDL) + QString(m_bufferReceived);
         Q_LOGEX(LOG_VERBOSE_WARNING, str);
 
         m_bufferReceived.clear();
@@ -329,7 +328,11 @@ bool PortController::parseBuffer()
   {
     if (m_modemDetected)
     {
-      if (!processUnexpectedData(m_bufferReceived))
+      if (processUnexpectedData(m_bufferReceived))
+      {
+        m_bufferReceived.clear();
+      }
+      else
       {
         m_portControllerStatus = PORT_CONTROLLER_STATUS_PROCESS_UNEXPECTED_DATA;
       }

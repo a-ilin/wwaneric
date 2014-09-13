@@ -187,7 +187,7 @@ signals:
   void replyReceived(ModemReply * reply);
 
 protected:
-  bool processConversation(const Conversation & c);
+  bool processConversation(Conversation c);
   bool processUnexpectedData(const QByteArray& data);
   QByteArray requestData() const;
   void modemDetected(bool status);

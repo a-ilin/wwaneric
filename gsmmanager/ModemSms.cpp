@@ -96,13 +96,15 @@ void SmsConversationHandler::processConversation(ModemRequest *request,
           {
             QStringList headerLine = parseAnswerLine(c.data.at(i), "+CMGL:");
 
-            // header has 4 fields
-            if (headerLine.size() == 4)
+            // header has at least 4 fields:
+            // 0    - is index
+            // 1    - is status
+            // 2    - is 'alpha' and not used
+            // last - is octet count and not used
+            if (headerLine.size() >= 4)
             {
               SAFE_CONVERT(int, toInt, msgIndex,  headerLine.at(0), answerDecoded=false;break;);
               SAFE_CONVERT(int, toInt, msgStatus, headerLine.at(1), answerDecoded=false;break;);
-              // field at index 2 is 'alpha' and not used
-              // field at index 3 is octet count and not used
 
               QByteArray pdu = c.data.at(i+1);
 
@@ -160,12 +162,13 @@ void SmsConversationHandler::processConversation(ModemRequest *request,
         {
           QStringList headerLine = parseAnswerLine(c.data.at(0), "+CMGR:");
 
-          // header has 3 fields
-          if (headerLine.size() == 3)
+          // header has at least 3 fields:
+          // 0    - is status
+          // 1    - is 'alpha' and not used
+          // last - is octet count and not used
+          if (headerLine.size() >= 3)
           {
             SAFE_CONVERT(int, toInt, msgStatus, headerLine.at(0), answerDecoded=false;);
-            // field at index 1 is 'alpha' and not used
-            // field at index 2 is octet count and not used
 
             QByteArray pdu = c.data.at(1);
 
