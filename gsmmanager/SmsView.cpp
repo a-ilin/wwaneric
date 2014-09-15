@@ -7,6 +7,7 @@
 
 #include <QItemSelection>
 #include <QMenu>
+#include <QScrollBar>
 #include <QStandardItemModel>
 #include <QTableView>
 
@@ -27,8 +28,10 @@ int smsGroupCompare(const Sms& first, const Sms& second)
   result = first.storage - second.storage;
   if (result) return result;
 
-  result = first.status - second.status;
-  if (result) return result;
+  // Modem Ericsson F5521GW can return status READ for NEW sms
+  // when executing AT+CMGR after CMTI event
+  //result = first.status - second.status;
+  //if (result) return result;
 
   result = first.sender.compare(second.sender);
   if (result) return result;
@@ -186,8 +189,34 @@ SMS_STATUS SmsModel::smsStatus(int row) const
 {
   const SmsList& smsList = m_smsList.at(row);
   Q_ASSERT(smsList.size());
-  SMS_STATUS status = smsList.first().status;
-  return status;
+
+  // check for at least one new in read
+  bool income = false;
+  bool neu = false;
+  foreach (const Sms& sms, smsList)
+  {
+    switch(sms.status)
+    {
+    case SMS_STATUS_INCOME:
+#ifdef QT_DEBUG
+      income = true;
+#endif
+      break;
+    case SMS_STATUS_NEW:
+      neu = true;
+      break;
+    default:
+      Q_ASSERT(!neu);
+      Q_ASSERT(!income);
+    }
+  }
+
+  if (neu)
+  {
+    return SMS_STATUS_NEW;
+  }
+
+  return smsList.first().status;
 }
 
 SMS_STORAGE SmsModel::smsStorage(int row) const
@@ -344,13 +373,12 @@ void SmsModel::deleteSmsDevice(SMS_STORAGE storage, int smsIndex)
   {
     SmsList& smsList = *iter;
     Q_ASSERT(smsList.size());
-    SMS_STATUS status = smsList.first().status;
     if (smsList.first().storage == storage)
     {
       for (SmsList::iterator smsIter = smsList.begin(); smsIter < smsList.end(); ++smsIter)
       {
         msgRow = iter - m_smsList.begin();
-
+        SMS_STATUS status = smsStatus(msgRow);
         Sms& sms = *smsIter;
         if (sms.index == smsIndex)
         {
@@ -372,6 +400,16 @@ void SmsModel::deleteSmsDevice(SMS_STORAGE storage, int smsIndex)
               iter = m_smsList.erase(iter);
               removeRows(msgRow, 1);
               msgRow = -1;
+            }
+            else
+            {
+              // check for status change
+              SMS_STATUS neuStatus = smsStatus(msgRow);
+              if (status != neuStatus)
+              {
+                --m_statusCount[status];
+                ++m_statusCount[neuStatus];
+              }
             }
           }
 
@@ -412,8 +450,8 @@ void SmsModel::deleteSmsDevice()
     else
     {
       // remove entire row
-      --m_statusCount[smsList.first().status];
       iter = m_smsList.erase(iter);
+      --m_statusCount[smsStatus(msgRow)];
       removeRows(msgRow, 1);
     }
   }
@@ -424,7 +462,7 @@ void SmsModel::deleteSmsDevice()
 void SmsModel::deleteSmsArchive(int row)
 {
   bool rmRow = false;
-  SMS_STATUS rmStatus;
+  SMS_STATUS status = smsStatus(row);
 
   SmsDatabaseEntity smsDb;
   if (smsDb.init())
@@ -448,7 +486,6 @@ void SmsModel::deleteSmsArchive(int row)
         if (sms.index == -1)
         {
           rmRow = true;
-          rmStatus = sms.status;
         }
       }
     }
@@ -457,7 +494,7 @@ void SmsModel::deleteSmsArchive(int row)
   if (rmRow)
   {
     // remove entire row
-    --m_statusCount[rmStatus];
+    --m_statusCount[status];
     removeRows(row, 1);
   }
 }
@@ -638,12 +675,18 @@ void SmsView::retranslateUi()
   QStringList headerLabels;
   headerLabels
       << tr("Archived")
-      << tr("Status")
       << tr("Storage")
+      << tr("Status")
       << tr("Date")
       << tr("Number")
       << tr("Message");
   m_sourceModel->setHorizontalHeaderLabels(headerLabels);
+
+  int align = Qt::AlignLeft | Qt::AlignVCenter;
+  for (int c = 0; c < headerLabels.size(); ++c)
+  {
+    m_sourceModel->setHeaderData(c, Qt::Horizontal, align, Qt::TextAlignmentRole);
+  }
 }
 
 void SmsView::processConnectionEvent(Core::ConnectionEvent event, const QVariant& data)
@@ -869,6 +912,9 @@ void SmsView::init()
     ui->smsView->addAction(m_smsReply);
   }
 
+  // header elide
+  ui->smsView->horizontalHeader()->setTextElideMode(Qt::ElideRight);
+
   // reset view
   retranslateUi();
   onModelReset();
@@ -952,7 +998,9 @@ void SmsView::onSelectionChanged()
                                                      + QChar(' ') + tr("SMSes"));
 
     ui->currentSmsInfo->appendHtml(smsHeader);
-    ui->currentSmsInfo->appendPlainText(QChar('\n') + m_sourceModel->smsText(sourceRow));
+    ui->currentSmsInfo->appendPlainText(m_sourceModel->smsText(sourceRow));
+
+    ui->currentSmsInfo->verticalScrollBar()->setValue(0);
   }
 }
 
