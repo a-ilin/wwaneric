@@ -450,8 +450,8 @@ void SmsModel::deleteSmsDevice()
     else
     {
       // remove entire row
-      iter = m_smsList.erase(iter);
       --m_statusCount[smsStatus(msgRow)];
+      iter = m_smsList.erase(iter);
       removeRows(msgRow, 1);
     }
   }
