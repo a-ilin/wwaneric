@@ -386,67 +386,52 @@ UssdTableWidget::UssdTableWidget(QWidget *parent) :
 
   connect(this, SIGNAL(cellDoubleClicked(int,int)),
           this, SLOT(onCellDoubleClicked(int,int)));
+
+  // create action
+  {
+    setContextMenuPolicy(Qt::ActionsContextMenu);
+
+    QAction * editUssd = new QAction(tr("Edit USSD"), this);
+    editUssd->setShortcut(QKeySequence("F2"));
+    connect(editUssd, SIGNAL(triggered()), SLOT(editSelectedIndex()));
+    addAction(editUssd);
+
+    QAction * deleteUssd = new QAction(tr("Delete USSD"), this);
+    deleteUssd->setShortcut(QKeySequence(QKeySequence::Delete));
+    connect(deleteUssd, SIGNAL(triggered()), SLOT(removeSelectedIndexes()));
+    addAction(deleteUssd);
+
+    connect(this, SIGNAL(itemSelectionChanged()), SLOT(onSelectionChanged()));
+    // disable actions by default
+    onSelectionChanged();
+  }
 }
 
-void UssdTableWidget::keyPressEvent(QKeyEvent * event)
+void UssdTableWidget::editSelectedIndex()
 {
-  if (event->matches(QKeySequence::Delete))
+  QModelIndex current = currentIndex();
+  // only in case of a single selection
+  Q_ASSERT(current.isValid());
+  if (current.isValid())
   {
-    event->accept();
-    removeSelectedIndexes();
+    QTableWidgetItem * i = item(current.row(), current.column());
+    editItem(i);
   }
-  else
-  {
-    QTableWidget::keyPressEvent(event);
-  }
-}
-
-void UssdTableWidget::contextMenuEvent(QContextMenuEvent *event)
-{
-  QModelIndex index = indexAt(event->pos());
-  QTableWidgetItem * item = itemAt(event->pos());
-
-  // construct menu
-  QMenu *menu = new QMenu(this);
-
-  QAction editUssd("Edit USSD", this);
-  QAction deleteUssd("Delete USSD", this);
-  if(!index.isValid())
-  {
-    editUssd.setEnabled(false);
-    deleteUssd.setEnabled(false);
-  }
-
-  menu->addAction(&editUssd);
-  menu->addAction(&deleteUssd);
-  QAction *executed = menu->exec(viewport()->mapToGlobal(event->pos()));
-
-  if (executed == &editUssd)
-  {
-    editItem(item);
-  }
-  else if (executed == &deleteUssd)
-  {
-      removeSelectedIndexes();
-  }
-
-  event->accept();
 }
 
 void UssdTableWidget::removeSelectedIndexes()
 {
   QList<QString> ussdList;
 
-  QModelIndexList selected = selectedIndexes();
+  QModelIndexList selected = selectionModel()->selectedRows();
   qSort(selected.begin(), selected.end());
 
-  for (int i = selected.size() - 1; i>= 0; --i)
+  for (int i = selected.size() - 1; i >= 0; --i)
   {
     const QModelIndex &index = selected.at(i);
 
-    // hack: we selecting by complete rows and
-    // indexes on the same row but different columns should be ignored
-    if (index.isValid() && (index.column() == 0))
+    Q_ASSERT(index.isValid());
+    if (index.isValid())
     {
       ussdList.append(index.data().toString());
       model()->removeRow(index.row());
@@ -464,6 +449,17 @@ void UssdTableWidget::onCellDoubleClicked(int row, int /*column*/)
   {
     QString ussd = index.data().toString();
     emit ussdActivated(ussd);
+  }
+}
+
+void UssdTableWidget::onSelectionChanged()
+{
+  QModelIndexList selected = selectionModel()->selectedRows();
+
+  bool enableActions = selected.size() > 0;
+  foreach(QAction * action, actions())
+  {
+    action->setEnabled(enableActions);
   }
 }
 

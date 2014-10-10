@@ -87,13 +87,11 @@ signals:
 
   void ussdActivated(const QString &ussd);
 
-protected:
-  void keyPressEvent(QKeyEvent * event);
-  void contextMenuEvent(QContextMenuEvent * event);
-
 protected slots:
+  void editSelectedIndex();
   void removeSelectedIndexes();
   void onCellDoubleClicked(int row, int /*column*/);
+  void onSelectionChanged();
 };
 
 

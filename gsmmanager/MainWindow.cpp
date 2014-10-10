@@ -272,7 +272,7 @@ void MainWindow::restore()
   m_minimizeOnClose = set.value(SET_MAINWINDOW_MINIMIZE_ON_CLOSE).toInt();
   m_exit = !m_minimizeOnClose;
   QStringList groups = set.value("groups").toStringList();
-  set.endGroup();
+  set.endGroup(); // SET_MAINWINDOW_GROUP
 
   foreach (const QString &grp, groups)
   {
@@ -283,7 +283,7 @@ void MainWindow::restore()
   set.beginGroup(SET_MAINWINDOW_GROUP);
   restoreGeometry(set.value("windowGeometry").toByteArray());
   restoreState(set.value("windowState").toByteArray());
-  set.endGroup();
+  set.endGroup(); // SET_MAINWINDOW_GROUP
 }
 
 void MainWindow::store()
@@ -300,7 +300,7 @@ void MainWindow::store()
   set.setValue("windowGeometry", saveGeometry());
   set.setValue("windowState", saveState());
 
-  set.endGroup();
+  set.endGroup(); // SET_MAINWINDOW_GROUP
 }
 
 void MainWindow::updateConnectionStatus(const QString& connectionId, bool status)
