@@ -185,7 +185,7 @@ QSqlQuery UssdDatabaseEntity::queryDelet(Database *db, const DatabaseKey &key) c
 {
   QString queryString =
       "DELETE "
-      "FROM ussd";
+      "FROM ussd %1 ";
 
   QStringList acceptedValues;
   acceptedValues << "a_ussd";

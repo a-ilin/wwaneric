@@ -431,7 +431,7 @@ QSqlQuery SmsDatabaseEntity::queryDelet(Database *db, const DatabaseKey &key) co
 {
   QString queryString =
       "DELETE "
-      "FROM sms";
+      "FROM sms %1 ";
 
   QStringList acceptedValues;
   acceptedValues << "a_connection" << "i_storage" << "i_status" << "a_raw";
