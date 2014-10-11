@@ -184,10 +184,12 @@ void MainWindow::addViewGroup(const QUuid& uuid)
 
     ConnBox& cBoxes = m_connBoxes[uuid];
 
+    QString uuidString = uuid.toString();
+
     // group menu
-    QMenu * menuGroup = new QMenu(uuid.toString(), this);
+    QMenu * menuGroup = new QMenu(uuidString, this);
     ui->menuConnections->addMenu(menuGroup);
-    menuGroup->setObjectName(uuid.toString());
+    menuGroup->setObjectName(uuidString);
 
     QList<QDockWidget*> dockWidgets;
 
@@ -196,8 +198,8 @@ void MainWindow::addViewGroup(const QUuid& uuid)
     foreach(IView* view, views)
     {
       // dock widget create
-      QDockWidget * dockWidget = new QDockWidget(uuid.toString(), this);
-      dockWidget->setObjectName(view->id());
+      QDockWidget * dockWidget = new QDockWidget(uuidString, this);
+      dockWidget->setObjectName(uuidString + view->id());
       dockWidget->setWidget(view->widget());
       dockWidget->setAllowedAreas(Qt::RightDockWidgetArea | Qt::BottomDockWidgetArea);
       addDockWidget(Qt::RightDockWidgetArea, dockWidget);
@@ -237,7 +239,7 @@ void MainWindow::addViewGroup(const QUuid& uuid)
       int row = ui->connectionsWidget->rowCount();
       ui->connectionsWidget->setRowCount(row + 1);
 
-      QTableWidgetItem * itemName = new QTableWidgetItem(uuid.toString());
+      QTableWidgetItem * itemName = new QTableWidgetItem(uuidString);
       itemName->setData(Qt::UserRole, uuid);
       ui->connectionsWidget->setItem(row, ColumnName, itemName);
 
@@ -439,6 +441,8 @@ void MainWindow::removeViewGroup(const QUuid& uuid, bool storeSettings)
     const ConnBox& cBox = m_connBoxes[uuid];
     const QList<Box>& boxes = cBox.boxes;
 
+    QString uuidString = uuid.toString();
+
     // remove dock widgets from MainWindow
     foreach(const Box& box, boxes)
     {
@@ -449,7 +453,7 @@ void MainWindow::removeViewGroup(const QUuid& uuid, bool storeSettings)
     if (storeSettings)
     {
       Settings set;
-      set.beginGroup(QString(SET_GROUP_PREFIX) + uuid.toString());
+      set.beginGroup(QString(SET_GROUP_PREFIX) + uuidString);
       set.setValue(SET_GROUP_NAME, cBox.name);
 
       foreach(const Box &box, boxes)
@@ -466,7 +470,7 @@ void MainWindow::removeViewGroup(const QUuid& uuid, bool storeSettings)
     else
     {
       Settings set;
-      set.remove(QString(SET_GROUP_PREFIX) + uuid.toString());
+      set.remove(QString(SET_GROUP_PREFIX) + uuidString);
     }
 
     // delete views
@@ -484,7 +488,7 @@ void MainWindow::removeViewGroup(const QUuid& uuid, bool storeSettings)
     }
 
     // menu
-    QMenu * menu = findChild<QMenu*>(uuid.toString());
+    QMenu * menu = findChild<QMenu*>(uuidString);
     Q_ASSERT(menu);
     if (menu)
     {
