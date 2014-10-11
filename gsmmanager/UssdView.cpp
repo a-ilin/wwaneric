@@ -14,7 +14,7 @@
 #define TABLE_COLUMN_USSD 0
 #define TABLE_COLUMN_DESCRIPTION 1
 
-UssdView::UssdView(const QString& connectionId, QWidget *parent) :
+UssdView::UssdView(const QUuid& connectionId, QWidget *parent) :
   QWidget(parent),
   IView(connectionId),
   ui(new Ui::UssdView)

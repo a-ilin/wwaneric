@@ -10,7 +10,7 @@ class IView
 {
 public:
 
-  IView(const QString &connectionId) :
+  IView(const QUuid& connectionId) :
     m_connectionId(connectionId)
   {}
 
@@ -43,13 +43,13 @@ public:
     Q_UNUSED(data);
   }
 
-  QString connectionId() const
+  QUuid connectionId() const
   {
     return m_connectionId;
   }
 
 private:
-  QString m_connectionId;
+  QUuid m_connectionId;
 };
 
 #endif // IVIEW_H

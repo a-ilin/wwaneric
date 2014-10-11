@@ -6,7 +6,7 @@
 #include <QtGlobal>
 #include <QList>
 #include <QObject>
-
+#include <QUuid>
 
 class MainWindow;
 class ModemThreadHelper;
@@ -36,13 +36,13 @@ public:
 
   static Core * instance() { return m_instance; }
 
-  void createConnection(const QString &id);
-  void removeConnection(const QString &id);
+  void createConnection(const QUuid& id);
+  void removeConnection(const QUuid& id);
 
   QString appUserDirectory() const;
 
   // returns the request created by modem
-  ModemRequest* modemRequest(const QString &connectionId,
+  ModemRequest* modemRequest(const QUuid &connectionId,
                              const QString &conversationHandlerName,
                              int requestType,
                              int requestRetries) const;
@@ -58,11 +58,11 @@ public slots:
   // push request to modem, request must be acquired by modemRequest(...) before this call
   void pushRequest(ModemRequest * request);
 
-  void openConnection(const QString &id, const QString &portName, const PortOptions &options);
-  void closeConnection(const QString &id);
+  void openConnection(const QUuid& id, const QString &portName, const PortOptions &options);
+  void closeConnection(const QUuid& id);
 
 signals:
-  void connectionEvent(const QString &connectionId, Core::ConnectionEvent event, const QVariant &data);
+  void connectionEvent(const QUuid& connectionId, Core::ConnectionEvent event, const QVariant &data);
 
 protected slots:
   // called via queued connection by modem when reply is ready.
@@ -77,7 +77,7 @@ private:
 
   static Core * m_instance;
 
-  QMap<QString, Modem* > m_modems;
+  QMap<QUuid, Modem* > m_modems;
   QList<ConversationHandler*> m_conversationHandlers;
 
   MainWindow * m_mainWindow;
@@ -98,7 +98,7 @@ public slots:
 
   // we need to create/delete modem and it's children and aggregates in separate thread,
   // call this slots using blocking queued connection to achieve this
-  void createModem(Modem** modem, const QString& id);
+  void createModem(Modem** modem, QUuid id);
   void deleteModem(Modem** modem);
 };
 

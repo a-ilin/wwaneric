@@ -122,10 +122,10 @@ void Core::tini()
 
     // modems
     Q_ASSERT(m_modems.isEmpty());
-    QStringList modemNames = m_modems.keys();
-    foreach(const QString &name, modemNames)
+    QList<QUuid> modemIds = m_modems.keys();
+    foreach(const QUuid &id, modemIds)
     {
-      removeConnection(name);
+      removeConnection(id);
     }
 
     // modems thread
@@ -156,7 +156,7 @@ void Core::tini()
 
 }
 
-void Core::createConnection(const QString& id)
+void Core::createConnection(const QUuid& id)
 {
   Q_ASSERT(!m_modems.contains(id));
 
@@ -165,7 +165,7 @@ void Core::createConnection(const QString& id)
   int result = QMetaObject::invokeMethod(m_modemThreadHelper, "createModem",
                                          Qt::BlockingQueuedConnection,
                                          Q_ARG(Modem**, &m),
-                                         Q_ARG(QString, id));
+                                         Q_ARG(QUuid, id));
   CHECK_METACALL_RESULT(result);
   Q_ASSERT(m);
 
@@ -186,11 +186,11 @@ void Core::createConnection(const QString& id)
           SLOT(onReplyReceived(ModemReply*)));
 }
 
-void Core::removeConnection(const QString& id)
+void Core::removeConnection(const QUuid& id)
 {
   Modem * m = m_modems.value(id);
   Q_ASSERT(m);
-  Q_ASSERT(m->property(CONNECTION_ID_PROPERTY).toString() == id);
+  Q_ASSERT(m->property(CONNECTION_ID_PROPERTY).toUuid() == id);
 
   if (m)
   {
@@ -212,14 +212,14 @@ QString Core::appUserDirectory() const
   return QApplication::applicationDirPath();
 }
 
-ModemRequest* Core::modemRequest(const QString& connectionId,
+ModemRequest* Core::modemRequest(const QUuid& connectionId,
                                  const QString& conversationHandlerName,
                                  int requestType,
                                  int requestRetries) const
 {
   Modem * m = m_modems.value(connectionId);
   Q_ASSERT(m);
-  Q_ASSERT(m->property(CONNECTION_ID_PROPERTY).toString() == connectionId);
+  Q_ASSERT(m->property(CONNECTION_ID_PROPERTY).toUuid() == connectionId);
 
   ModemRequest * request = NULL;
 
@@ -236,7 +236,7 @@ void Core::onReplyReceived(ModemReply* reply)
 {
   Modem * modem = static_cast<Modem*>(sender());
   Q_ASSERT(modem);
-  QString id = modem->property(CONNECTION_ID_PROPERTY).toString();
+  QUuid id = modem->property(CONNECTION_ID_PROPERTY).toUuid();
   // this is should be direct connection
   emit connectionEvent(id, ConnectionEventCustom, QVariant::fromValue<ModemReply*>(reply));
   delete reply;
@@ -246,8 +246,7 @@ void Core::onConnectionStatusChanged(bool status)
 {
   Modem * modem = static_cast<Modem*>(sender());
   Q_ASSERT(modem);
-  QString id = modem->property(CONNECTION_ID_PROPERTY).toString();
-
+  QUuid id = modem->property(CONNECTION_ID_PROPERTY).toUuid();
   emit connectionEvent(id, ConnectionEventStatus, status);
 }
 
@@ -255,7 +254,7 @@ void Core::onConnectionErrorOccured(const QString error)
 {
   Modem * modem = static_cast<Modem*>(sender());
   Q_ASSERT(modem);
-  QString id = modem->property(CONNECTION_ID_PROPERTY).toString();
+  QUuid id = modem->property(CONNECTION_ID_PROPERTY).toUuid();
   emit connectionEvent(id, ConnectionEventError, error);
 }
 
@@ -268,11 +267,11 @@ void Core::pushRequest(ModemRequest* request)
   CHECK_METACALL_RESULT(result);
 }
 
-void Core::openConnection(const QString& id, const QString& portName, const PortOptions& options)
+void Core::openConnection(const QUuid& id, const QString& portName, const PortOptions& options)
 {
   Modem * m = m_modems.value(id);
   Q_ASSERT(m);
-  Q_ASSERT(m->property(CONNECTION_ID_PROPERTY).toString() == id);
+  Q_ASSERT(m->property(CONNECTION_ID_PROPERTY).toUuid() == id);
 
   if (m)
   {
@@ -293,11 +292,11 @@ void Core::openConnection(const QString& id, const QString& portName, const Port
   }
 }
 
-void Core::closeConnection(const QString& id)
+void Core::closeConnection(const QUuid& id)
 {
   Modem * m = m_modems.value(id);
   Q_ASSERT(m);
-  Q_ASSERT(m->property(CONNECTION_ID_PROPERTY).toString() == id);
+  Q_ASSERT(m->property(CONNECTION_ID_PROPERTY).toUuid() == id);
 
   if (m)
   {
@@ -317,7 +316,7 @@ void Core::restoreSettings()
 
 }
 
-void ModemThreadHelper::createModem(Modem** modem, const QString& id)
+void ModemThreadHelper::createModem(Modem** modem, QUuid id)
 {
   (*modem) = new Modem();
   (*modem)->setProperty(CONNECTION_ID_PROPERTY, id);

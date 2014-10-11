@@ -58,7 +58,7 @@ bool smsListLessThen(const SmsList& first, const SmsList& second)
   return smsGroupCompare(first.first(), second.first()) < 0;
 }
 
-SmsModel::SmsModel(const QString& connectionId, QObject* parent) :
+SmsModel::SmsModel(const QUuid& connectionId, QObject* parent) :
   QStandardItemModel(parent),
   m_connectionId(connectionId),
   m_archivedCount(0)
@@ -70,7 +70,7 @@ SmsModel::SmsModel(const QString& connectionId, QObject* parent) :
   if (smsDb.init())
   {
     DatabaseKey key;
-    key.insert("a_connection", m_connectionId);
+    key.insert("a_connection", m_connectionId.toString());
     QList<SmsBase> smsBaseList = smsDb.select(key);
 
     foreach(const SmsBase& smsBase, smsBaseList)
@@ -308,7 +308,7 @@ bool SmsModel::isArchived(const Sms& sms) const
   if (smsDb.init())
   {
     DatabaseKey key;
-    key.insert("a_connection", m_connectionId);
+    key.insert("a_connection", m_connectionId.toString());
     key.insert("i_storage", sms.storage);
     key.insert("i_status", sms.status);
     key.insert("a_raw", QString(sms.rawData));
@@ -348,7 +348,7 @@ void SmsModel::archiveSms(int row)
     foreach(const Sms& sms, m_smsList.at(row))
     {
         SmsBase smsBase;
-        smsBase.connectionId = m_connectionId;
+        smsBase.connectionId = m_connectionId.toString();
         smsBase.storage = sms.storage;
         smsBase.status = sms.status;
         smsBase.rawData = sms.rawData;
@@ -473,7 +473,7 @@ void SmsModel::deleteSmsArchive(int row)
       Sms& sms = *smsIter;
 
       DatabaseKey key;
-      key.insert("a_connection", m_connectionId);
+      key.insert("a_connection", m_connectionId.toString());
       key.insert("i_storage", sms.storage);
       key.insert("i_status", sms.status);
       key.insert("a_raw", sms.rawData);
@@ -640,7 +640,7 @@ void SmsModel::updateRowData(int row)
 #define SMS_STORAGE_PROPERTY "smsStorage"
 
 
-SmsView::SmsView(const QString& connectionId, QWidget *parent) :
+SmsView::SmsView(const QUuid& connectionId, QWidget *parent) :
   QWidget(parent),
   IView(connectionId),
   ui(new Ui::SmsView),

@@ -15,7 +15,7 @@ class SerialPortSettingsView : public QWidget, public IView
   Q_OBJECT
 
 public:
-  explicit SerialPortSettingsView(const QString &connectionId, QWidget *parent = 0);
+  explicit SerialPortSettingsView(const QUuid& connectionId, QWidget *parent = 0);
   ~SerialPortSettingsView();
 
   void init();

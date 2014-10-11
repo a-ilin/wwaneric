@@ -15,7 +15,7 @@ class UssdView : public QWidget, public IView
   Q_OBJECT
 
 public:
-  explicit UssdView(const QString &connectionId, QWidget *parent = 0);
+  explicit UssdView(const QUuid& connectionId, QWidget *parent = 0);
   ~UssdView();
 
   void init();

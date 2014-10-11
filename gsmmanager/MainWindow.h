@@ -26,16 +26,17 @@ public:
   explicit MainWindow(QWidget *parent = 0);
   ~MainWindow();
 
-  void addViewGroup(const QString &groupName);
-  void removeViewGroup(const QString &groupName);
+  void addViewGroup(const QUuid& uuid);
+  void removeViewGroup(const QUuid& uuid, bool storeSettings);
+  void setViewGroupName(const QUuid& uuid, const QString& userName);
 
   void init();
   void tini();
 
   QSystemTrayIcon* trayIcon() const { return m_trayIcon; }
 
-  void updateConnectionStatus(const QString& connectionId, bool status);
-  void updateSignalStrength(const QString& connectionId, double strengthPercent);
+  void updateConnectionStatus(const QUuid& connectionId, bool status);
+  void updateSignalStrength(const QUuid& connectionId, double strengthPercent);
 
   enum ConnectionColumns
   {
@@ -59,11 +60,20 @@ protected:
     IView * view;
   };
 
-  QList<IView *> createViews(const QString& groupName);
-  void removeViews(const QList<Box>& boxes, const QString &groupName);
+  struct ConnBox
+  {
+    QString name;
+    QList<Box> boxes;
+  };
+
+  QList<IView *> createViews(const QUuid& uuid);
 
   void restore();
   void store();
+
+  int connectionWidgetRow(const QUuid& uuid) const;
+
+  QString askUserConnectionName(const QUuid& uuid);
 
 protected slots:
   void addConnection();
@@ -75,7 +85,8 @@ protected slots:
   void onShowAction();
   void onExitAction();
   void onRemoveGroupAction();
-  void onConnectionEvent(const QString &connectionId,
+  void onRenameGroupAction();
+  void onConnectionEvent(const QUuid& connectionId,
                          Core::ConnectionEvent event,
                          const QVariant &data);
 
@@ -83,8 +94,8 @@ protected:
   Ui::MainWindow *ui;
 
 
-  typedef QHash<QString, Box> ContainerHash;
-  ContainerHash m_boxes;
+  typedef QMap<QUuid, ConnBox> ConnectMap;
+  ConnectMap m_connBoxes;
 
   QSystemTrayIcon * m_trayIcon;
   QMenu * m_trayMenu;

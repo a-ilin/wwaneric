@@ -20,6 +20,7 @@
 #include <QMdiSubWindow>
 #include <QMessageBox>
 #include <QUrl>
+#include <QUuid>
 
 #ifdef QT_DEBUG
 #include "debugParsers.h"
@@ -27,6 +28,7 @@
 
 #define SET_GROUP_PREFIX "grp_"
 #define SET_VIEW_PREFIX  "view_"
+#define SET_GROUP_NAME "groupName"
 
 MainWindow::MainWindow(QWidget *parent) :
   QMainWindow(parent),
@@ -69,8 +71,8 @@ MainWindow::MainWindow(QWidget *parent) :
   ui->connectionsWidget->setColumnCount(ColumnLast);
 
   // Core connections
-  connect(Core::instance(), SIGNAL(connectionEvent(QString,Core::ConnectionEvent,QVariant)),
-          this, SLOT(onConnectionEvent(QString,Core::ConnectionEvent,QVariant)),
+  connect(Core::instance(), SIGNAL(connectionEvent(QUuid,Core::ConnectionEvent,QVariant)),
+          this, SLOT(onConnectionEvent(QUuid,Core::ConnectionEvent,QVariant)),
           Qt::DirectConnection);
 
   // application style sheet
@@ -146,18 +148,17 @@ void MainWindow::closeEvent(QCloseEvent* event)
   }
 }
 
-QList<IView *> MainWindow::createViews(const QString &groupName)
+QList<IView *> MainWindow::createViews(const QUuid& uuid)
 {
   QList<IView *> views;
 
-  views.append(new ModemStatusView(groupName, this));
-  views.append(new SmsView(groupName, this));
-  views.append(new UssdView(groupName, this));
-  views.append(new SerialPortSettingsView(groupName, this));
+  views.append(new ModemStatusView(uuid, this));
+  views.append(new SmsView(uuid, this));
+  views.append(new UssdView(uuid, this));
+  views.append(new SerialPortSettingsView(uuid, this));
 
   Settings set;
-
-  set.beginGroup(QString(SET_GROUP_PREFIX) + groupName);
+  set.beginGroup(QString(SET_GROUP_PREFIX) + uuid.toString());
 
   foreach(IView* view, views)
   {
@@ -173,28 +174,29 @@ QList<IView *> MainWindow::createViews(const QString &groupName)
   return views;
 }
 
-void MainWindow::addViewGroup(const QString &groupName)
+void MainWindow::addViewGroup(const QUuid& uuid)
 {
   // create new one
-  if(!m_boxes.contains(groupName))
+  if(! m_connBoxes.contains(uuid))
   {
     // core connection
-    Core::instance()->createConnection(groupName);
+    Core::instance()->createConnection(uuid);
+
+    ConnBox& cBoxes = m_connBoxes[uuid];
 
     // group menu
-    QMenu * menuGroup = new QMenu(groupName, this);
+    QMenu * menuGroup = new QMenu(uuid.toString(), this);
     ui->menuConnections->addMenu(menuGroup);
-    menuGroup->setObjectName(groupName);
+    menuGroup->setObjectName(uuid.toString());
 
     QList<QDockWidget*> dockWidgets;
 
     // views
-    QList<IView *> views = createViews(groupName);
+    QList<IView *> views = createViews(uuid);
     foreach(IView* view, views)
     {
       // dock widget create
-      QString name = QString("%1 - %2").arg(groupName).arg(view->name());
-      QDockWidget * dockWidget = new QDockWidget(name, this);
+      QDockWidget * dockWidget = new QDockWidget(uuid.toString(), this);
       dockWidget->setObjectName(view->id());
       dockWidget->setWidget(view->widget());
       dockWidget->setAllowedAreas(Qt::RightDockWidgetArea | Qt::BottomDockWidgetArea);
@@ -205,7 +207,7 @@ void MainWindow::addViewGroup(const QString &groupName)
       Box box;
       box.view = view;
       box.container = dockWidget;
-      m_boxes.insertMulti(groupName, box);
+      cBoxes.boxes.append(box);
     }
 
     // tabify created dock widgets
@@ -220,8 +222,13 @@ void MainWindow::addViewGroup(const QString &groupName)
 
     // group menu
     menuGroup->addSeparator();
+    QAction * renameAction = menuGroup->addAction(tr("Rename connection"));
+    renameAction->setData(uuid);
+    renameAction->setIcon(QIcon("icons/application_rename_connection.png"));
+    connect(renameAction, SIGNAL(triggered()), SLOT(onRenameGroupAction()));
+
     QAction * removeAction = menuGroup->addAction(tr("Remove connection"));
-    removeAction->setData(groupName);
+    removeAction->setData(uuid);
     removeAction->setIcon(QIcon("icons/application_delete_connection.png"));
     connect(removeAction, SIGNAL(triggered()), SLOT(onRemoveGroupAction()));
 
@@ -230,7 +237,8 @@ void MainWindow::addViewGroup(const QString &groupName)
       int row = ui->connectionsWidget->rowCount();
       ui->connectionsWidget->setRowCount(row + 1);
 
-      QTableWidgetItem * itemName = new QTableWidgetItem(groupName);
+      QTableWidgetItem * itemName = new QTableWidgetItem(uuid.toString());
+      itemName->setData(Qt::UserRole, uuid);
       ui->connectionsWidget->setItem(row, ColumnName, itemName);
 
       QTableWidgetItem * itemStatus = new QTableWidgetItem(QString());
@@ -239,30 +247,14 @@ void MainWindow::addViewGroup(const QString &groupName)
       QTableWidgetItem * itemSignal = new QTableWidgetItem(QString());
       ui->connectionsWidget->setItem(row, ColumnSignalStrength, itemSignal);
 
-      updateConnectionStatus(groupName, false);
-      updateSignalStrength(groupName, 0.0);
+      updateConnectionStatus(uuid, false);
+      updateSignalStrength(uuid, 0.0);
     }
   }
-}
-
-void MainWindow::removeViews(const QList<Box> & boxes, const QString& groupName)
-{
-  Settings set;
-  set.beginGroup(QString(SET_GROUP_PREFIX) + groupName);
-
-  foreach(const Box &box, boxes)
+  else
   {
-    IView * view = box.view;
-
-    set.beginGroup(QString(SET_VIEW_PREFIX) + view->id());
-    view->store(set);
-    set.endGroup();
-
-    view->tini();
-    delete view;
+    Q_LOGEX(LOG_VERBOSE_CRITICAL, QString("UUID is not unique: ") + uuid.toString());
   }
-
-  set.endGroup();
 }
 
 void MainWindow::restore()
@@ -274,9 +266,18 @@ void MainWindow::restore()
   QStringList groups = set.value("groups").toStringList();
   set.endGroup(); // SET_MAINWINDOW_GROUP
 
-  foreach (const QString &grp, groups)
+  foreach (const QString &uuidString, groups)
   {
-    addViewGroup(grp);
+    QUuid uuid(uuidString);
+
+    addViewGroup(uuid);
+
+    // group name
+    Settings set;
+    set.beginGroup(QString(SET_GROUP_PREFIX) + uuid.toString());
+    QString groupName = set.value(SET_GROUP_NAME, uuid.toString()).toString();
+    set.endGroup();
+    setViewGroupName(uuid, groupName);
   }
 
   // geometry, state
@@ -293,8 +294,15 @@ void MainWindow::store()
   set.beginGroup(SET_MAINWINDOW_GROUP);
   set.setValue(SET_MAINWINDOW_MINIMIZE_ON_CLOSE, m_minimizeOnClose ? 1 : 0);
 
-  QStringList groups = m_boxes.uniqueKeys();
-  set.setValue("groups", groups);
+  QList<QUuid> uuids = m_connBoxes.uniqueKeys();
+  QStringList uuidStrings;
+  uuidStrings.reserve(uuids.size());
+  foreach (const QUuid& uuid, uuids)
+  {
+    uuidStrings.append(uuid.toString());
+  }
+
+  set.setValue("groups", uuidStrings);
 
   // geometry, state
   set.setValue("windowGeometry", saveGeometry());
@@ -303,13 +311,65 @@ void MainWindow::store()
   set.endGroup(); // SET_MAINWINDOW_GROUP
 }
 
-void MainWindow::updateConnectionStatus(const QString& connectionId, bool status)
+int MainWindow::connectionWidgetRow(const QUuid& uuid) const
 {
-  QList<QTableWidgetItem*> items = ui->connectionsWidget->findItems(connectionId,
-                                                                    Qt::MatchExactly);
+  QAbstractItemModel * m = ui->connectionsWidget->model();
+  Q_ASSERT(m->rowCount() > 0);
+  QModelIndexList indexes = m->match(m->index(0, ColumnName), Qt::UserRole, uuid);
+  Q_ASSERT(indexes.size() == 1);
 
-  Q_ASSERT(items.size() == 1);
-  int row = items.at(0)->row();
+  int row = indexes.first().row();
+  return row;
+}
+
+QString MainWindow::askUserConnectionName(const QUuid& uuid)
+{
+  bool ok = false;
+  QString defaultName = m_connBoxes.value(uuid).name;
+  QString name = QInputDialog::getText(this, tr("Specify connection name"),
+                                       tr("Name: "), QLineEdit::Normal, defaultName, &ok);
+
+  QString errorTitle = tr("Connection creation error");
+
+  if (! ok)
+  {
+    return QString();
+  }
+
+  if (name.isEmpty())
+  {
+    QMessageBox::critical(this, errorTitle, tr("Connection name cannot be empty!"));
+    return QString();
+  }
+
+  // check uniqueness
+  bool unique = true;
+
+  ConnectMap::const_iterator iter = m_connBoxes.constBegin();
+  ConnectMap::const_iterator iterEnd = m_connBoxes.constEnd();
+  while (iter != iterEnd)
+  {
+    if ( (iter.key() != uuid) && ((*iter).name == name) )
+    {
+      unique = false;
+      break;
+    }
+
+    ++iter;
+  }
+
+  if (! unique)
+  {
+    QMessageBox::critical(this, errorTitle, tr("Connection name should be unique!"));
+    return QString();
+  }
+
+  return name;
+}
+
+void MainWindow::updateConnectionStatus(const QUuid& connectionId, bool status)
+{
+  int row = connectionWidgetRow(connectionId);
 
   QTableWidgetItem * statusItem = ui->connectionsWidget->item(row, ColumnStatus);
   Q_ASSERT(statusItem);
@@ -328,7 +388,7 @@ void MainWindow::updateConnectionStatus(const QString& connectionId, bool status
   ui->connectionsWidget->resizeColumnsToContents();
 }
 
-void MainWindow::updateSignalStrength(const QString& connectionId, double strengthPercent)
+void MainWindow::updateSignalStrength(const QUuid& connectionId, double strengthPercent)
 {
   QIcon signalIcon;
 
@@ -357,11 +417,7 @@ void MainWindow::updateSignalStrength(const QString& connectionId, double streng
     signalIcon = QIcon("icons/signal_strength_100.png");
   }
 
-  QList<QTableWidgetItem*> items = ui->connectionsWidget->findItems(connectionId,
-                                                                    Qt::MatchExactly);
-
-  Q_ASSERT(items.size() == 1);
-  int row = items.at(0)->row();
+  int row = connectionWidgetRow(connectionId);
 
   QTableWidgetItem * signalItem = ui->connectionsWidget->item(row, ColumnSignalStrength);
   Q_ASSERT(signalItem);
@@ -372,50 +428,109 @@ void MainWindow::updateSignalStrength(const QString& connectionId, double streng
   ui->connectionsWidget->resizeColumnsToContents();
 }
 
-void MainWindow::removeViewGroup(const QString &groupName)
+void MainWindow::removeViewGroup(const QUuid& uuid, bool storeSettings)
 {
   // FIXME: remove archived SMS for group!
-  QList<Box> boxes = m_boxes.values(groupName);
 
-  if (boxes.size())
+  ConnectMap::iterator iter = m_connBoxes.find(uuid);
+
+  if (iter != m_connBoxes.end())
   {
-    m_boxes.remove(groupName);
+    const ConnBox& cBox = m_connBoxes[uuid];
+    const QList<Box>& boxes = cBox.boxes;
 
     // remove dock widgets from MainWindow
-    foreach(const Box &box, boxes)
+    foreach(const Box& box, boxes)
     {
       removeDockWidget(box.container);
+    }
+
+    // store views
+    if (storeSettings)
+    {
+      Settings set;
+      set.beginGroup(QString(SET_GROUP_PREFIX) + uuid.toString());
+      set.setValue(SET_GROUP_NAME, cBox.name);
+
+      foreach(const Box &box, boxes)
+      {
+        IView * view = box.view;
+
+        set.beginGroup(QString(SET_VIEW_PREFIX) + view->id());
+        view->store(set);
+        set.endGroup();
+      }
+
+      set.endGroup();
+    }
+    else
+    {
+      Settings set;
+      set.remove(QString(SET_GROUP_PREFIX) + uuid.toString());
     }
 
     // delete views
-    removeViews(boxes, groupName);
-
     foreach(const Box &box, boxes)
     {
-      // delete dock widgets
-      removeDockWidget(box.container);
+      IView * view = box.view;
+      view->tini();
+      delete view;
+    }
+
+    // delete dock widgets
+    foreach(const Box& box, boxes)
+    {
+      box.container->deleteLater();
     }
 
     // menu
-    QMenu * menu = findChild<QMenu*>(groupName);
+    QMenu * menu = findChild<QMenu*>(uuid.toString());
     Q_ASSERT(menu);
-    menu->clear();
-    ui->menuConnections->removeAction(menu->menuAction());
-    menu->deleteLater();
+    if (menu)
+    {
+      menu->clear();
+      ui->menuConnections->removeAction(menu->menuAction());
+      menu->deleteLater();
+    }
 
     // core connection
-    Core::instance()->removeConnection(groupName);
+    Core::instance()->removeConnection(uuid);
 
     // connections widget
     {
-      QList<QTableWidgetItem*> items = ui->connectionsWidget->findItems(groupName,
-                                                                        Qt::MatchExactly);
-
-      Q_ASSERT(items.size() == 1);
-      int row = items.at(0)->row();
+      int row = connectionWidgetRow(uuid);
       ui->connectionsWidget->removeRow(row);
     }
+
+    m_connBoxes.erase(iter);
   }
+}
+
+void MainWindow::setViewGroupName(const QUuid& uuid, const QString& userName)
+{
+  // container
+  ConnectMap::iterator iter = m_connBoxes.find(uuid);
+  Q_ASSERT(iter != m_connBoxes.end());
+  ConnBox& cBox = *iter;
+  const QList<Box>& boxes = cBox.boxes;
+  cBox.name = userName;
+
+  // dock widgets
+  foreach (const Box& box, boxes)
+  {
+    QString name = QString("%1 - %2").arg(userName).arg(box.view->name());
+    box.container->setWindowTitle(name);
+  }
+
+  // connection widget
+  int row = connectionWidgetRow(uuid);
+  QTableWidgetItem * nameItem = ui->connectionsWidget->item(row, ColumnName);
+  nameItem->setText(userName);
+
+  // menu
+  QMenu * menu = findChild<QMenu*>(uuid.toString());
+  Q_ASSERT(menu);
+  menu->menuAction()->setText(userName);
 }
 
 void MainWindow::init()
@@ -427,29 +542,21 @@ void MainWindow::tini()
 {
   store();
 
-  QStringList groups = m_boxes.uniqueKeys();
-  foreach(const QString &group, groups)
+  QList<QUuid> uuids = m_connBoxes.uniqueKeys();
+  foreach(const QUuid& uuid, uuids)
   {
-    removeViewGroup(group);
+    removeViewGroup(uuid, true);
   }
 }
 
 void MainWindow::addConnection()
 {
-  bool ok = false;
-  QString name = QInputDialog::getText(this, tr("Specify connection name"),
-                                       tr("Name: "), QLineEdit::Normal, QString(), &ok);
-
-  if (ok)
+  QUuid uuid = QUuid::createUuid();
+  QString name = askUserConnectionName(uuid);
+  if (! name.isEmpty())
   {
-    if (!name.isEmpty())
-    {
-      addViewGroup(name);
-    }
-    else
-    {
-      QMessageBox::critical(this, tr("Wrong value"), tr("Name cannot be empty!"));
-    }
+    addViewGroup(uuid);
+    setViewGroupName(uuid, name);
   }
 }
 
@@ -519,28 +626,39 @@ void MainWindow::onRemoveGroupAction()
 {
   QAction * action = qobject_cast<QAction*>(sender());
   Q_ASSERT(action);
-  QString groupName = action->data().toString();
+  QUuid uuid = action->data().toUuid();
+  QString name = m_connBoxes[uuid].name;
 
   if (QMessageBox::question(this, tr("Remove connection?"),
                         tr("Are you really like to remove connection \"%1\"?" ENDL
                            "Archived messages, stored settings and other info will be removed.")
-                            .arg(groupName),
+                            .arg(name),
                         QMessageBox::Yes, QMessageBox::No) == QMessageBox::Yes)
   {
-    removeViewGroup(groupName);
-    Settings set;
-    set.remove(QString(SET_GROUP_PREFIX) + groupName);
+    removeViewGroup(uuid, false);
   }
 }
 
-void MainWindow::onConnectionEvent(const QString& connectionId,
+void MainWindow::onRenameGroupAction()
+{
+  QAction * action = qobject_cast<QAction*>(sender());
+  Q_ASSERT(action);
+  QUuid uuid = action->data().toUuid();
+  QString name = askUserConnectionName(uuid);
+  if (! name.isEmpty())
+  {
+    setViewGroupName(uuid, name);
+  }
+}
+
+void MainWindow::onConnectionEvent(const QUuid& connectionId,
                                    Core::ConnectionEvent event,
                                    const QVariant& data)
 {
-  QList<Box> boxes = m_boxes.values(connectionId);
+  const QList<Box>& boxes = m_connBoxes[connectionId].boxes;
   Q_ASSERT(boxes.size());
 
-  foreach (const Box &box, boxes)
+  foreach (const Box& box, boxes)
   {
     box.view->processConnectionEvent(event, data);
   }

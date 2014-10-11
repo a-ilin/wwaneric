@@ -32,7 +32,7 @@ public:
     ColumnLast
   };
 
-  explicit SmsModel(const QString& connectionId, QObject * parent = NULL);
+  explicit SmsModel(const QUuid& connectionId, QObject * parent = NULL);
 
   // info
   SMS_STATUS smsStatus(int row) const;
@@ -65,7 +65,7 @@ private:
 
 private:
 
-  QString m_connectionId;
+  QUuid m_connectionId;
 
   // internal data store for the model
   QList<SmsList> m_smsList;
@@ -83,7 +83,7 @@ class SmsView : public QWidget, public IView
   Q_OBJECT
 
 public:
-  explicit SmsView(const QString &connectionId, QWidget *parent = 0);
+  explicit SmsView(const QUuid& connectionId, QWidget *parent = 0);
   ~SmsView();
 
   void init();

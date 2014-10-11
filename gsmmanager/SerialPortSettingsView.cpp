@@ -11,7 +11,7 @@
 
 #define DEFAULT_TO_CB_LINK_PROPERTY "defaultToCheckBoxLink"
 
-SerialPortSettingsView::SerialPortSettingsView(const QString& connectionId, QWidget *parent) :
+SerialPortSettingsView::SerialPortSettingsView(const QUuid& connectionId, QWidget *parent) :
   QWidget(parent),
   IView(connectionId),
   ui(new Ui::SerialPortSettingsView)

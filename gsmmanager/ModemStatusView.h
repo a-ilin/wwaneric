@@ -17,7 +17,7 @@ class ModemStatusView : public QWidget, public IView
   Q_OBJECT
 
 public:
-  explicit ModemStatusView(const QString &connectionId, QWidget *parent = 0);
+  explicit ModemStatusView(const QUuid& connectionId, QWidget *parent = 0);
   ~ModemStatusView();
 
   void init();

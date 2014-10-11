@@ -10,7 +10,7 @@
 #include <QClipboard>
 #include <QTimer>
 
-ModemStatusView::ModemStatusView(const QString& connectionId, QWidget *parent) :
+ModemStatusView::ModemStatusView(const QUuid& connectionId, QWidget *parent) :
   QWidget(parent),
   IView(connectionId),
   ui(new Ui::ModemStatusView)
