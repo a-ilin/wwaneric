@@ -88,7 +88,7 @@ inline bool mutexLock()
   DWORD result = WaitForSingleObject(logMutex, INFINITE);
   if (result != WAIT_OBJECT_0)
   {
-    printf("Cannot lock mutex! Logging message skipped! File: %s, Line: %s" ENDL, __FILE__, STRINGIFY(__LINE__));
+    printf("Cannot lock mutex! Logging message skipped! File: %s, Line: %s" ENDL, __FILE__, TOSTRING(__LINE__));
     return false;
   }
 

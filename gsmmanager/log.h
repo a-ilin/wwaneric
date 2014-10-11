@@ -19,13 +19,13 @@
 
 typedef enum LOG_VERBOSE
 {
-    LOG_VERBOSE_RAW,            // no classificator printed in RAW verbose mode
-    LOG_VERBOSE_DEBUG,
-    LOG_VERBOSE_NOTIFICATION,
-    LOG_VERBOSE_WARNING,
-    LOG_VERBOSE_ERROR,
-    LOG_VERBOSE_CRITICAL,
-    LOG_VERBOSE_LAST = -1       // for inner use by logging system
+  LOG_VERBOSE_RAW,            // no classificator printed in RAW verbose mode
+  LOG_VERBOSE_DEBUG,
+  LOG_VERBOSE_NOTIFICATION,
+  LOG_VERBOSE_WARNING,
+  LOG_VERBOSE_ERROR,
+  LOG_VERBOSE_CRITICAL,
+  LOG_VERBOSE_LAST = -1       // for internal use by logging system
 } LOG_VERBOSE;
 
 // path to log file.
@@ -49,8 +49,8 @@ LOG_VERBOSE validateVerbosityFromString(std::string verbosity);
 #define WIDEN2(x) L ## x
 #define WIDEN(x) WIDEN2(x)
 
-#define STRINGIFY(x) #x
-#define TOSTRING(x) STRINGIFY(x)
+#define TOSTRING2(x) #x
+#define TOSTRING(x) TOSTRING2(x)
 
 #ifdef LOG_ENABLED
 
@@ -65,20 +65,20 @@ void WriteLog(const wchar_t * message);
 #endif
 
 #define LOGEX(VERBOSITY,MESSAGEFMT) \
-        { \
-            std::wstringstream _msg; \
-            _msg << L"MSGID:$" << WIDEN(TOSTRING(__COUNTER__)) << L"$ " \
-                 << WIDEN(__FILE__) << L":" << WIDEN(TOSTRING(__LINE__)) \
-                 << L" @ " << __PRETTY_FUNCTION__ << L": "; \
-            WriteLogEx(VERBOSITY, _msg.str().data(), MESSAGEFMT); \
-        }
+  { \
+    const wchar_t position[] = \
+      L"MSGID:$" WIDEN(TOSTRING(__COUNTER__)) L"$ " \
+      WIDEN(__FILE__) L":" WIDEN(TOSTRING(__LINE__)) \
+      L" @ " WIDEN(__PRETTY_FUNCTION__) L": "; \
+    WriteLogEx(VERBOSITY, position, MESSAGEFMT); \
+  }
 
 #define LOG(MESSAGEFMT) LOGEX(LOG_VERBOSE_RAW, MESSAGEFMT)
 
 // Qt
 #ifdef QT_VERSION
 // Q_MESSAGEFMT can be an object that accepted in QString constructor
-#define Q_LOGEX(VERBOSITY,Q_MESSAGEFMT) \
+#define Q_LOGEX(VERBOSITY, Q_MESSAGEFMT) \
   { \
     QString _str(Q_MESSAGEFMT); \
     wchar_t * _array = new wchar_t[_str.size() + 1]; \
