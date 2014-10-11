@@ -13,12 +13,15 @@
 
 #include "AppSettingsDialog.h"
 
+#include <QAction>
 #include <QCloseEvent>
 #include <QDesktopServices>
 #include <QDockWidget>
 #include <QInputDialog>
+#include <QItemDelegate>
 #include <QMdiSubWindow>
 #include <QMessageBox>
+#include <QMouseEvent>
 #include <QUrl>
 #include <QUuid>
 
@@ -29,6 +32,29 @@
 #define SET_GROUP_PREFIX "grp_"
 #define SET_VIEW_PREFIX  "view_"
 #define SET_GROUP_NAME "groupName"
+
+class ConnectionWidgetDelegate : public QItemDelegate
+{
+public:
+  ConnectionWidgetDelegate(QObject * parent = NULL) :
+    QItemDelegate(parent)
+  {}
+
+  void paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const
+  {
+    QStyleOptionViewItem opt = option;
+    opt.state &= ~QStyle::State_Selected;
+    QItemDelegate::paint(painter, opt, index);
+  }
+
+protected:
+  void drawFocus (QPainter * painter, const QStyleOptionViewItem& option, const QRect& rect) const
+  {
+    QStyleOptionViewItem opt = option;
+    opt.state &= ~QStyle::State_HasFocus;
+    QItemDelegate::drawFocus(painter, opt, rect);
+  }
+};
 
 MainWindow::MainWindow(QWidget *parent) :
   QMainWindow(parent),
@@ -69,6 +95,11 @@ MainWindow::MainWindow(QWidget *parent) :
 
   // connections widget
   ui->connectionsWidget->setColumnCount(ColumnLast);
+  ui->connectionsWidget->setItemDelegate(new ConnectionWidgetDelegate(ui->connectionsWidget));
+  ui->connectionsWidget->setContextMenuPolicy(Qt::CustomContextMenu);
+  ui->connectionsWidget->viewport()->installEventFilter(this);
+  connect(ui->connectionsWidget, SIGNAL(customContextMenuRequested(QPoint)),
+          SLOT(onConnectionContextMenu(QPoint)));
 
   // Core connections
   connect(Core::instance(), SIGNAL(connectionEvent(QUuid,Core::ConnectionEvent,QVariant)),
@@ -119,6 +150,25 @@ MainWindow::MainWindow(QWidget *parent) :
 MainWindow::~MainWindow()
 {
   delete ui;
+}
+
+bool MainWindow::eventFilter(QObject* watched, QEvent* event)
+{
+  if (watched == ui->connectionsWidget->viewport())
+  {
+    if (event->type() == QEvent::MouseButtonPress)
+    {
+      QMouseEvent * me = static_cast<QMouseEvent*> (event);
+      QModelIndex index = ui->connectionsWidget->indexAt(me->pos());
+      if (! index.isValid())
+      {
+        // clear selection when clicking empty space
+        ui->connectionsWidget->clearSelection();
+      }
+    }
+  }
+
+  return QMainWindow::eventFilter(watched, event);
 }
 
 void MainWindow::changeEvent(QEvent *e)
@@ -186,11 +236,6 @@ void MainWindow::addViewGroup(const QUuid& uuid)
 
     QString uuidString = uuid.toString();
 
-    // group menu
-    QMenu * menuGroup = new QMenu(uuidString, this);
-    ui->menuConnections->addMenu(menuGroup);
-    menuGroup->setObjectName(uuidString);
-
     QList<QDockWidget*> dockWidgets;
 
     // views
@@ -222,24 +267,15 @@ void MainWindow::addViewGroup(const QUuid& uuid)
       dockWidgets.at(0)->raise();
     }
 
-    // group menu
-    menuGroup->addSeparator();
-    QAction * renameAction = menuGroup->addAction(tr("Rename connection"));
-    renameAction->setData(uuid);
-    renameAction->setIcon(QIcon("icons/application_rename_connection.png"));
-    connect(renameAction, SIGNAL(triggered()), SLOT(onRenameGroupAction()));
-
-    QAction * removeAction = menuGroup->addAction(tr("Remove connection"));
-    removeAction->setData(uuid);
-    removeAction->setIcon(QIcon("icons/application_delete_connection.png"));
-    connect(removeAction, SIGNAL(triggered()), SLOT(onRemoveGroupAction()));
-
     // connection widget item
     {
       int row = ui->connectionsWidget->rowCount();
       ui->connectionsWidget->setRowCount(row + 1);
 
       QTableWidgetItem * itemName = new QTableWidgetItem(uuidString);
+      QFont fontName = itemName->font();
+      fontName.setBold(true);
+      itemName->setFont(fontName);
       itemName->setData(Qt::UserRole, uuid);
       ui->connectionsWidget->setItem(row, ColumnName, itemName);
 
@@ -251,6 +287,31 @@ void MainWindow::addViewGroup(const QUuid& uuid)
 
       updateConnectionStatus(uuid, false);
       updateSignalStrength(uuid, 0.0);
+    }
+
+    // group menu
+    {
+      QMenu * menuGroup = new QMenu(uuidString, this);
+      ui->menuConnections->addMenu(menuGroup);
+      menuGroup->setObjectName(uuidString);
+
+      menuGroup->addSeparator();
+
+      QMenu * dockMenu = createPopupMenu();
+      menuGroup->addActions(dockMenu->actions());
+      delete dockMenu;
+
+      menuGroup->addSeparator();
+
+      QAction * renameAction = menuGroup->addAction(tr("Rename connection"));
+      renameAction->setData(uuid);
+      renameAction->setIcon(QIcon("icons/application_rename_connection.png"));
+      connect(renameAction, SIGNAL(triggered()), SLOT(onRenameGroupAction()));
+
+      QAction * removeAction = menuGroup->addAction(tr("Remove connection"));
+      removeAction->setData(uuid);
+      removeAction->setIcon(QIcon("icons/application_delete_connection.png"));
+      connect(removeAction, SIGNAL(triggered()), SLOT(onRemoveGroupAction()));
     }
   }
   else
@@ -443,6 +504,16 @@ void MainWindow::removeViewGroup(const QUuid& uuid, bool storeSettings)
 
     QString uuidString = uuid.toString();
 
+    // menu
+    QMenu * menu = findChild<QMenu*>(uuidString);
+    Q_ASSERT(menu);
+    if (menu)
+    {
+      menu->clear();
+      ui->menuConnections->removeAction(menu->menuAction());
+      menu->deleteLater();
+    }
+
     // remove dock widgets from MainWindow
     foreach(const Box& box, boxes)
     {
@@ -485,16 +556,6 @@ void MainWindow::removeViewGroup(const QUuid& uuid, bool storeSettings)
     foreach(const Box& box, boxes)
     {
       box.container->deleteLater();
-    }
-
-    // menu
-    QMenu * menu = findChild<QMenu*>(uuidString);
-    Q_ASSERT(menu);
-    if (menu)
-    {
-      menu->clear();
-      ui->menuConnections->removeAction(menu->menuAction());
-      menu->deleteLater();
     }
 
     // core connection
@@ -652,6 +713,31 @@ void MainWindow::onRenameGroupAction()
   if (! name.isEmpty())
   {
     setViewGroupName(uuid, name);
+  }
+}
+
+void MainWindow::onConnectionContextMenu(const QPoint & pos)
+{
+  QAbstractItemModel * m = ui->connectionsWidget->model();
+  Q_ASSERT(m->rowCount() > 0);
+
+  // use selection model
+  QModelIndexList selected = ui->connectionsWidget->selectionModel()->selectedRows(ColumnName);
+  if (! selected.isEmpty())
+  {
+    Q_ASSERT(selected.size() == 1);
+
+    QModelIndex current = selected.first();
+    Q_ASSERT(current.isValid());
+    QUuid uuid = m->data(current, Qt::UserRole).toUuid();
+    QString uuidString = uuid.toString();
+
+    // menu
+    QMenu * menu = findChild<QMenu*>(uuidString);
+    Q_ASSERT(menu);
+
+    Q_ASSERT(static_cast<QTableWidget*>(sender()) == ui->connectionsWidget);
+    menu->popup(ui->connectionsWidget->mapToGlobal(pos));
   }
 }
 

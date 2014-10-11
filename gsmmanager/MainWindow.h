@@ -26,6 +26,8 @@ public:
   explicit MainWindow(QWidget *parent = 0);
   ~MainWindow();
 
+  bool eventFilter(QObject* watched, QEvent* event);
+
   void addViewGroup(const QUuid& uuid);
   void removeViewGroup(const QUuid& uuid, bool storeSettings);
   void setViewGroupName(const QUuid& uuid, const QString& userName);
@@ -86,6 +88,9 @@ protected slots:
   void onExitAction();
   void onRemoveGroupAction();
   void onRenameGroupAction();
+
+  void onConnectionContextMenu(const QPoint& pos);
+
   void onConnectionEvent(const QUuid& connectionId,
                          Core::ConnectionEvent event,
                          const QVariant &data);
