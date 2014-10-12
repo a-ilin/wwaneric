@@ -13,6 +13,10 @@
 #include <QItemSelection>
 #include <QThread>
 
+#ifdef F_OS_WINDOWS
+#include <qt_windows.h>
+#endif
+
 // QObject's property of Modem class that contains it's connection ID
 #define CONNECTION_ID_PROPERTY "connectionId"
 
@@ -48,9 +52,12 @@ bool Core::init()
       {
           return false;
       }
-      logFilePath = (appUserDirectory() + QDir::separator() + QString("gsmmanager.log")).toLocal8Bit().constData();
-      logAutoFlush = true;
-      currentVerbosity = LOG_VERBOSE_DEBUG;
+
+      QString logPath(appUserDirectory() + QDir::separator() + QString("gsmmanager.log"));
+      g_logFilePath = logPath.toStdWString();
+
+      g_logAutoFlush = true;
+      g_currentVerbosity = LOG_VERBOSE_DEBUG;
       LogFlush();
     }
 
@@ -207,9 +214,41 @@ void Core::removeConnection(const QUuid& id)
 
 
 
-QString Core::appUserDirectory() const
+QString Core::appUserDirectory()
 {
-  return QApplication::applicationDirPath();
+  QString dir;
+  if (qApp)
+  {
+    dir = QApplication::applicationDirPath();
+  }
+  else
+  {
+    // QCoreApplication is not instantiated yet
+
+#ifdef F_OS_WINDOWS
+    LPTSTR pBuf = new TCHAR[_MAX_PATH];
+    int bytes = GetModuleFileName(NULL, pBuf, _MAX_PATH);
+    if (bytes)
+    {
+      QString appPath = QString::fromWCharArray(pBuf);
+      dir = appPath.mid(0, appPath.lastIndexOf(QDir::separator()));
+    }
+    delete[] pBuf;
+
+//#elif F_OS_LINUX
+//    char szTmp[64];
+//    sprintf(szTmp, "/proc/%d/exe", getpid());
+//    int bytes = MIN(readlink(szTmp, pBuf, len), len - 1);
+//    if(bytes >= 0)
+//        pBuf[bytes] = '\0';
+//    return bytes;
+#else
+#error("Platform not supported!")
+#endif
+
+  }
+
+  return dir;
 }
 
 ModemRequest* Core::modemRequest(const QUuid& connectionId,

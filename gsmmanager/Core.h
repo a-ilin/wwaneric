@@ -39,7 +39,7 @@ public:
   void createConnection(const QUuid& id);
   void removeConnection(const QUuid& id);
 
-  QString appUserDirectory() const;
+  static QString appUserDirectory();
 
   // returns the request created by modem
   ModemRequest* modemRequest(const QUuid &connectionId,

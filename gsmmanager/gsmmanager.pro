@@ -6,6 +6,8 @@ greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
 DESTDIR = ..
 
+include($$PWD/../wwaneric.pri)
+
 #win32:CONFIG(release, debug|release): LIBS += -L$$OUT_PWD/../pdu-bin/release/ -lpdu
 #else:win32:CONFIG(debug, debug|release): LIBS += -L$$OUT_PWD/../pdu-bin/debug/ -lpdu
 #else:unix: LIBS += -L$$OUT_PWD/../pdu-bin/release/ -lpdu
@@ -35,12 +37,15 @@ win32-msvc* {
 }
 
 
-
-
-
+win32 {
+  SOURCES += \
+    crashdump_win.cpp \
+    zip_win.cpp
+}
 
 SOURCES += \
-    main.cpp\
+    main.cpp \
+    crashdump.cpp \
     log.cpp \
     Core.cpp \
     MainWindow.cpp \
@@ -62,6 +67,8 @@ SOURCES += \
     SerialPortSettingsView.cpp
 
 HEADERS  += \
+    crashdump.h \
+    zip.h \
     common.h \
     log.h \
     IView.h \

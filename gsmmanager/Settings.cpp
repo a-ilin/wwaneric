@@ -6,7 +6,12 @@
 #include <QDir>
 
 Settings::Settings() :
-  QSettings(Core::instance()->appUserDirectory() + QDir::separator() + QString("gsmmanager.conf"),
+  QSettings(configFile(),
             QSettings::IniFormat)
 {
+}
+
+QString Settings::configFile()
+{
+  return Core::instance()->appUserDirectory() + QDir::separator() + QString("gsmmanager.conf");
 }

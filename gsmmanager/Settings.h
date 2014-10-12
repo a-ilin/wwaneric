@@ -7,6 +7,9 @@ class Settings : public QSettings
 {
 public:
   Settings();
+
+  static QString configFile();
+
 };
 
 #endif // SETTINGS_H

@@ -175,16 +175,16 @@ void stopLogging()
 #define MAX_LOG_MESSAGE_CHARACTERS 4096
 
 // filename with full path
-std::string logFilePath;
+std::wstring g_logFilePath;
 
 // automatically flush log on each message
-bool logAutoFlush = false;
+bool g_logAutoFlush = false;
 
 // accumulates log messages between log flushing
 std::wstring logCapacitor;
 
 // filter
-LOG_VERBOSE currentVerbosity = LOG_VERBOSE_LAST;
+LOG_VERBOSE g_currentVerbosity = LOG_VERBOSE_LAST;
 
 // recognizes argument as a verbosity level and returns it
 LOG_VERBOSE validateVerbosityFromString(std::string verbosity)
@@ -300,6 +300,8 @@ size_t null_wcodecvt::m_refs = 0;
 
 
 #include <sys/stat.h>
+#include <wchar.h>
+#include <sys/types.h>
 // Function: fileExists
 /**
     Check if a file exists
@@ -308,14 +310,24 @@ size_t null_wcodecvt::m_refs = 0;
 @return    true if the file exists, else false
 
 */
-bool fileExists(const std::string& filename)
+bool fileExists(const std::wstring& filename)
 {
-  struct stat buf;
-  if (stat(filename.c_str(), &buf) != -1)
+  struct _stat buf;
+  if (_wstat(filename.c_str(), &buf) != -1)
   {
     return true;
   }
   return false;
+}
+
+_off_t fileSize(const std::wstring& filename)
+{
+  struct _stat buf;
+  if (_wstat(filename.c_str(), &buf) != -1)
+  {
+    return buf.st_size;
+  }
+  return 0;
 }
 
 // function controls log output
@@ -327,7 +339,7 @@ void LogRaw(const std::wstring &str)
   }
 
   // if there is no filename set we will write log to standard output
-  if (logFilePath.empty())
+  if (g_logFilePath.empty())
   {
     fwrite((char*)str.c_str(), str.size() * sizeof(wchar_t), 1, stdout);
     fflush(stdout);
@@ -340,16 +352,16 @@ void LogRaw(const std::wstring &str)
     output.imbue(wloc);
 
     bool needProlog = false;
-    if (!fileExists(logFilePath))
+    if (!fileExists(g_logFilePath))
     {
       needProlog = true;
     }
 
-    output.open(logFilePath, std::ios_base::binary | std::ios_base::out | std::ios_base::app);
+    output.open(g_logFilePath, std::ios_base::binary | std::ios_base::out | std::ios_base::app);
 
     if (output.fail())
     {
-        wprintf(L"Error opening log file for logging: %s" WENDL, logFilePath.c_str());
+        wprintf(L"Error opening log file for logging: %s" WENDL, g_logFilePath.c_str());
         return;
     }
 
@@ -384,7 +396,7 @@ void WriteLogEx(LOG_VERBOSE verbose, const wchar_t * position, const wchar_t * m
 
   // if would like to receive only high valuable messages...
   std::wstring verboseStr;
-  if (verbose >= currentVerbosity)
+  if (verbose >= g_currentVerbosity)
   {
     switch (verbose)
     {
@@ -486,7 +498,7 @@ void WriteLogEx(LOG_VERBOSE verbose, const wchar_t * position, const wchar_t * m
     _str << messageOut;
     wendl(_str);
 
-    if (logAutoFlush)
+    if (g_logAutoFlush)
     {
       LogRaw(_str.str());
     }

@@ -191,7 +191,10 @@ SMS_STATUS SmsModel::smsStatus(int row) const
   Q_ASSERT(smsList.size());
 
   // check for at least one new in read
+#ifdef QT_DEBUG
   bool income = false;
+#endif
+
   bool neu = false;
   foreach (const Sms& sms, smsList)
   {

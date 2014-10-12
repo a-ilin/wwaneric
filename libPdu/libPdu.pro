@@ -7,6 +7,8 @@ TARGET = libPdu
 
 DEFINES += PDU_DECODE_EXPORTS
 
+include($$PWD/../wwaneric.pri)
+
 win32-msvc* {
   # MSVC
   # Disable C996 Warning

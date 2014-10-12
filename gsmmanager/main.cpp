@@ -3,13 +3,20 @@
 #include <QApplication>
 #include <QDir>
 #include <QIcon>
-#include <QSettings>
 
 #include "Core.h"
+#include "Settings.h"
 
+#include "crashdump.h"
 
 int main(int argc, char *argv[])
 {
+  // dump handler registration
+#ifndef QT_DEBUG
+  CrashDumpHandler dumpHandler(kInfoLevelSmall);
+  dumpHandler.addToArchiveList(Settings::configFile().toStdWString());
+#endif
+
   QApplication a(argc, argv);
 
   QApplication::setOrganizationName("Aleksei Ilin");
@@ -20,7 +27,7 @@ int main(int argc, char *argv[])
 #ifdef QT_DEBUG
   a.addLibraryPath(a.applicationDirPath());
 #else
-  // this needs to remove unnecessary QT_INSTALL path
+  // this is needs to remove unnecessary QT_INSTALL path
   QStringList newLibraryPaths;
   newLibraryPaths << a.applicationDirPath();
   a.setLibraryPaths(newLibraryPaths);

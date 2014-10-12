@@ -31,16 +31,25 @@ typedef enum LOG_VERBOSE
 // path to log file.
 // when not empty logging writes to this file
 // otherwise to standard output
-extern std::string logFilePath;
+extern
+std::wstring g_logFilePath;
 
 // all messages that have status below this will be omitted
-extern LOG_VERBOSE currentVerbosity;
+extern
+LOG_VERBOSE g_currentVerbosity;
 
 // if set to true the flushing will be made automatically
-extern bool logAutoFlush;
+extern
+bool g_logAutoFlush;
 
 // flushing content of log capacitor string
-extern void LogFlush();
+void LogFlush();
+
+// checks if a file is exists
+bool fileExists(const std::wstring& filename);
+
+// returns file size
+_off_t fileSize(const std::wstring& filename);
 
 // recognize argument as a string describes some verbosity level.
 // if cannot recognize a verbosity level returns the highest verbosity level (LOG_VERBOSE_LAST)
