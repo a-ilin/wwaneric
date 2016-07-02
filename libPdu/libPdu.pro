@@ -12,7 +12,7 @@ include($$PWD/../wwaneric.pri)
 win32-msvc* {
   # MSVC
   # Disable C996 Warning
-  DEFINES += _CRT_SECURE_NO_WARNINGS snprintf=_snprintf
+  DEFINES += _CRT_SECURE_NO_WARNINGS
 } else {
   # MinGW
   QMAKE_CXXFLAGS += -std=c++0x

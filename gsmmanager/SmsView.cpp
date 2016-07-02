@@ -211,6 +211,7 @@ SMS_STATUS SmsModel::smsStatus(int row) const
     default:
       Q_ASSERT(!neu);
       Q_ASSERT(!income);
+      break;
     }
   }
 

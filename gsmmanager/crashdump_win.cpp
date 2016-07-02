@@ -48,7 +48,7 @@ void BrowseToFile(LPCTSTR filename)
   }
 }
 
-void ShowMessage(TCHAR* error, TCHAR* dumpFile)
+void ShowMessage(const TCHAR* error, TCHAR* dumpFile)
 {
   const int MAX_STR = 4096;
 
@@ -102,7 +102,7 @@ struct DumperParams
   _EXCEPTION_POINTERS* ExceptionInfo;
   DWORD dwExceptionThreadId;
 
-  TCHAR * error;
+  const TCHAR * error;
 };
 
 

@@ -1,0 +1,433 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 39;
+	objects = {
+		014CEA520018CE5811CA2923 = {
+			buildSettings = {
+				COPY_PHASE_STRIP = NO;
+				DEBUGGING_SYMBOLS = YES;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_ENABLE_FIX_AND_CONTINUE = YES;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				OPTIMIZATION_CFLAGS = "-O0";
+				ZERO_LINK = YES;
+			};
+			isa = PBXBuildStyle;
+			name = Development;
+		};
+		014CEA530018CE5811CA2923 = {
+			buildSettings = {
+				COPY_PHASE_STRIP = YES;
+				GCC_ENABLE_FIX_AND_CONTINUE = NO;
+				ZERO_LINK = NO;
+			};
+			isa = PBXBuildStyle;
+			name = Deployment;
+		};
+//010
+//011
+//012
+//013
+//014
+//080
+//081
+//082
+//083
+//084
+		08FB7793FE84155DC02AAC07 = {
+			buildSettings = {
+			};
+			buildStyles = (
+				014CEA520018CE5811CA2923,
+				014CEA530018CE5811CA2923,
+			);
+			hasScannedForEncodings = 1;
+			isa = PBXProject;
+			mainGroup = 08FB7794FE84155DC02AAC07;
+			projectDirPath = "";
+			targets = (
+				CFE2FC1207B7E14B00E7DB3D,
+			);
+		};
+		08FB7794FE84155DC02AAC07 = {
+			children = (
+				CF78563D07BE4D9C007DD154,
+				CF61C86107B7D186008933AD,
+				CF61C86E07B7D314008933AD,
+				CFE2FBDA07B7DB3200E7DB3D,
+			);
+			isa = PBXGroup;
+			name = libPDU;
+			refType = 4;
+			sourceTree = "<group>";
+		};
+//080
+//081
+//082
+//083
+//084
+//CF0
+//CF1
+//CF2
+//CF3
+//CF4
+		CF3B611607BAA1C900022EB5 = {
+			fileEncoding = 4;
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = pdu_userdata.h;
+			path = /Users/jamespitts/Source/libPDU/src/pdu_userdata.h;
+			refType = 0;
+			sourceTree = "<absolute>";
+		};
+		CF3B611707BAA1C900022EB5 = {
+			fileEncoding = 4;
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = pdu_userdata.cpp;
+			path = /Users/jamespitts/Source/libPDU/src/pdu_userdata.cpp;
+			refType = 0;
+			sourceTree = "<absolute>";
+		};
+		CF61C86107B7D186008933AD = {
+			fileEncoding = 4;
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.make;
+			path = Makefile;
+			refType = 4;
+			sourceTree = "<group>";
+		};
+		CF61C86407B7D218008933AD = {
+			fileEncoding = 4;
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = pdu_base.h;
+			path = src/pdu_base.h;
+			refType = 4;
+			sourceTree = "<group>";
+			usesTabs = 0;
+		};
+		CF61C86507B7D218008933AD = {
+			fileEncoding = 4;
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = pdu_base.cpp;
+			path = src/pdu_base.cpp;
+			refType = 4;
+			sourceTree = "<group>";
+		};
+		CF61C86D07B7D261008933AD = {
+			fileEncoding = 4;
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.make;
+			name = Makefile;
+			path = src/Makefile;
+			refType = 4;
+			sourceTree = "<group>";
+		};
+		CF61C86E07B7D314008933AD = {
+			children = (
+				CF61C86D07B7D261008933AD,
+				CFE2FD6007B83B0700E7DB3D,
+				CFE2FBF807B7DEDC00E7DB3D,
+			);
+			isa = PBXGroup;
+			name = src;
+			refType = 4;
+			sourceTree = "<group>";
+		};
+		CF7855C807BE3897007DD154 = {
+			fileEncoding = 4;
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = pdu_7bit_packing.h;
+			path = src/pdu_7bit_packing.h;
+			refType = 4;
+			sourceTree = "<group>";
+		};
+		CF7855C907BE3897007DD154 = {
+			fileEncoding = 4;
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = pdu_7bit_packing.cpp;
+			path = src/pdu_7bit_packing.cpp;
+			refType = 4;
+			sourceTree = "<group>";
+		};
+		CF78563D07BE4D9C007DD154 = {
+			fileEncoding = 30;
+			isa = PBXFileReference;
+			lastKnownFileType = text;
+			name = Doxyfile;
+			path = Docs/Doxyfile;
+			refType = 4;
+			sourceTree = "<group>";
+		};
+		CF78566707BE4F47007DD154 = {
+			fileEncoding = 4;
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = pdu_8bit_packing.h;
+			path = src/pdu_8bit_packing.h;
+			refType = 4;
+			sourceTree = "<group>";
+		};
+		CF78566807BE4F47007DD154 = {
+			fileEncoding = 4;
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = pdu_8bit_packing.cpp;
+			path = src/pdu_8bit_packing.cpp;
+			refType = 4;
+			sourceTree = "<group>";
+		};
+		CFB25F6E07B7D7B7009ACED1 = {
+			fileEncoding = 4;
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = pdu_deliver.h;
+			path = src/pdu_deliver.h;
+			refType = 4;
+			sourceTree = "<group>";
+		};
+		CFB25F6F07B7D7B7009ACED1 = {
+			fileEncoding = 4;
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = pdu_deliver.cpp;
+			path = src/pdu_deliver.cpp;
+			refType = 4;
+			sourceTree = "<group>";
+		};
+		CFB4EB6107BC3C7500C68807 = {
+			fileEncoding = 4;
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = pdu_datacoding.h;
+			path = src/pdu_datacoding.h;
+			refType = 4;
+			sourceTree = "<group>";
+		};
+		CFB4EB6207BC3C7500C68807 = {
+			fileEncoding = 4;
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = pdu_datacoding.cpp;
+			path = src/pdu_datacoding.cpp;
+			refType = 4;
+			sourceTree = "<group>";
+		};
+		CFC6C5FB07B93A030050FF2D = {
+			fileEncoding = 4;
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = pdu_log.h;
+			path = src/pdu_log.h;
+			refType = 4;
+			sourceTree = "<group>";
+		};
+		CFC6C5FC07B93A030050FF2D = {
+			fileEncoding = 4;
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = pdu_log.cpp;
+			path = src/pdu_log.cpp;
+			refType = 4;
+			sourceTree = "<group>";
+		};
+		CFD89E5A07BFABF900218FB3 = {
+			fileEncoding = 4;
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = pdu_userdataheader.h;
+			path = src/pdu_userdataheader.h;
+			refType = 4;
+			sourceTree = "<group>";
+		};
+		CFD89E5B07BFABF900218FB3 = {
+			fileEncoding = 4;
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = pdu_userdataheader.cpp;
+			path = src/pdu_userdataheader.cpp;
+			refType = 4;
+			sourceTree = "<group>";
+		};
+		CFE2FBDA07B7DB3200E7DB3D = {
+			children = (
+				CFE2FBDD07B7DB9600E7DB3D,
+				CFE2FBDB07B7DB6100E7DB3D,
+				CFE2FBDC07B7DB6100E7DB3D,
+			);
+			isa = PBXGroup;
+			name = test;
+			refType = 4;
+			sourceTree = "<group>";
+		};
+		CFE2FBDB07B7DB6100E7DB3D = {
+			fileEncoding = 4;
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = pdutest.h;
+			path = test/pdutest.h;
+			refType = 4;
+			sourceTree = "<group>";
+		};
+		CFE2FBDC07B7DB6100E7DB3D = {
+			fileEncoding = 4;
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = pdutest.cpp;
+			path = test/pdutest.cpp;
+			refType = 4;
+			sourceTree = "<group>";
+		};
+		CFE2FBDD07B7DB9600E7DB3D = {
+			fileEncoding = 4;
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.make;
+			name = Makefile;
+			path = test/Makefile;
+			refType = 4;
+			sourceTree = "<group>";
+		};
+		CFE2FBF807B7DEDC00E7DB3D = {
+			children = (
+				CF78566707BE4F47007DD154,
+				CFE2FC8107B7FC0B00E7DB3D,
+				CF7855C807BE3897007DD154,
+				CFE2FCF707B82A7A00E7DB3D,
+				CF61C86407B7D218008933AD,
+				CFB4EB6107BC3C7500C68807,
+				CFB25F6E07B7D7B7009ACED1,
+				CFC6C5FB07B93A030050FF2D,
+				CFE2FC8F07B7FEF400E7DB3D,
+				CFE2FC3F07B7F45200E7DB3D,
+				CF3B611607BAA1C900022EB5,
+				CFD89E5A07BFABF900218FB3,
+			);
+			isa = PBXGroup;
+			name = Headers;
+			path = "";
+			refType = 4;
+			sourceTree = "<group>";
+		};
+		CFE2FC1207B7E14B00E7DB3D = {
+			buildArgumentsString = "$(ACTION)";
+			buildPhases = (
+			);
+			buildSettings = {
+				OTHER_CFLAGS = "";
+				OTHER_LDFLAGS = "";
+				OTHER_REZFLAGS = "";
+				PRODUCT_NAME = libpdu;
+				SECTORDER_FLAGS = "";
+				WARNING_CFLAGS = "-Wmost -Wno-four-char-constants -Wno-unknown-pragmas";
+			};
+			buildToolPath = /usr/bin/make;
+			dependencies = (
+			);
+			isa = PBXLegacyTarget;
+			name = libpdu.dylib;
+			passBuildSettingsInEnvironment = 1;
+			productName = libpdu.dylib;
+		};
+		CFE2FC3F07B7F45200E7DB3D = {
+			fileEncoding = 4;
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = pdu_submit.h;
+			path = src/pdu_submit.h;
+			refType = 4;
+			sourceTree = "<group>";
+		};
+		CFE2FC4007B7F45200E7DB3D = {
+			fileEncoding = 4;
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = pdu_submit.cpp;
+			path = src/pdu_submit.cpp;
+			refType = 4;
+			sourceTree = "<group>";
+		};
+		CFE2FC8107B7FC0B00E7DB3D = {
+			fileEncoding = 4;
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = Pdu.h;
+			path = src/Pdu.h;
+			refType = 4;
+			sourceTree = "<group>";
+		};
+		CFE2FC8207B7FC0B00E7DB3D = {
+			fileEncoding = 4;
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = Pdu.cpp;
+			path = src/Pdu.cpp;
+			refType = 4;
+			sourceTree = "<group>";
+		};
+		CFE2FC8F07B7FEF400E7DB3D = {
+			fileEncoding = 4;
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = pdu_packed.h;
+			path = src/pdu_packed.h;
+			refType = 4;
+			sourceTree = "<group>";
+		};
+		CFE2FC9007B7FEF400E7DB3D = {
+			fileEncoding = 4;
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = pdu_packed.cpp;
+			path = src/pdu_packed.cpp;
+			refType = 4;
+			sourceTree = "<group>";
+		};
+		CFE2FCF707B82A7A00E7DB3D = {
+			fileEncoding = 4;
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = pdu_address.h;
+			path = src/pdu_address.h;
+			refType = 4;
+			sourceTree = "<group>";
+		};
+		CFE2FCF807B82A7A00E7DB3D = {
+			fileEncoding = 4;
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = pdu_address.cpp;
+			path = src/pdu_address.cpp;
+			refType = 4;
+			sourceTree = "<group>";
+		};
+		CFE2FD6007B83B0700E7DB3D = {
+			children = (
+				CF78566807BE4F47007DD154,
+				CFE2FC8207B7FC0B00E7DB3D,
+				CF7855C907BE3897007DD154,
+				CFE2FCF807B82A7A00E7DB3D,
+				CF61C86507B7D218008933AD,
+				CFB4EB6207BC3C7500C68807,
+				CFB25F6F07B7D7B7009ACED1,
+				CFC6C5FC07B93A030050FF2D,
+				CFE2FC9007B7FEF400E7DB3D,
+				CFE2FC4007B7F45200E7DB3D,
+				CF3B611707BAA1C900022EB5,
+				CFD89E5B07BFABF900218FB3,
+			);
+			isa = PBXGroup;
+			name = Source;
+			refType = 4;
+			sourceTree = "<group>";
+		};
+	};
+	rootObject = 08FB7793FE84155DC02AAC07;
+}

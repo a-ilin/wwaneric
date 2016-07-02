@@ -1,4 +1,4 @@
-﻿/*
+/*
  *  pdu_packed.cpp
  *  libPDU
  *
@@ -51,12 +51,12 @@ unsigned int Pdu_Packed::getOctetAsInt ( void )
       val =  ::strtol  ( packed_.substr(current_,2).c_str(), NULL, 16);
 
       if (val == LONG_MAX || val == LONG_MIN )
-        throw "strtol failed : "__FILE__;
+        throw "strtol failed : " __FILE__;
 
       current_ += 2;
      } catch ( std::exception e ) {
 
-      throw "getOctectAsInt failed : "__FILE__;
+      throw "getOctectAsInt failed : " __FILE__;
      }
 
     return val;
@@ -70,13 +70,13 @@ unsigned int Pdu_Packed::getSemiOctetAsInt ( void )
 
     if (current_ + 2 > packed_.length() )
     {
-      throw "getOctectAsInt failed : "__FILE__;
+      throw "getOctectAsInt failed : " __FILE__;
     }
 
     unsigned int val =  ::strtol  ( packed_.substr(current_,2).c_str(), NULL, 16);
 
     if (val == LONG_MAX || val == LONG_MIN )
-      throw "strtol failed : "__FILE__;
+      throw "strtol failed : " __FILE__;
 
     current_ += 2;
 
@@ -105,10 +105,10 @@ void Pdu_Packed::getSemiOctetAsString  ( std::string &dest, unsigned int length 
 {
 
     if ( length <= 0 )
-      throw "Length <= 0 : "__FILE__;
+      throw "Length <= 0 : " __FILE__;
 
     if ( current_ + length > packed_.length() )
-      throw "Request for  > Pdu length  : "__FILE__;
+      throw "Request for  > Pdu length  : " __FILE__;
 
     unsigned int i = 0;
     dest = "";
@@ -138,10 +138,10 @@ void Pdu_Packed::getSemiOctetAsString  ( std::string &dest, unsigned int length 
 void Pdu_Packed::getOctetAsString ( std::string &dest, int length )
 {
     if ( length <= 0 )
-      throw "Length <= 0 : "__FILE__;
+      throw "Length <= 0 : " __FILE__;
 
     if ( current_ + length > packed_.length() )
-      throw "Request for  > Pdu length  : "__FILE__;
+      throw "Request for  > Pdu length  : " __FILE__;
 
     length *= 2;  // convert to semi octets
     dest  = packed_.substr ( current_, length );

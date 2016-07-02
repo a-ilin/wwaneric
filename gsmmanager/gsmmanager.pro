@@ -14,7 +14,7 @@ include($$PWD/../wwaneric.pri)
 
 #LIBS += -L$$OUT_PWD/../pdu-bin/release/ -lpdu
 #LIBS += -L$$DESTDIR -L$$OUT_PWD -lpdu
-LIBS += -L$$DESTDIR -lpdu -llibPdu
+LIBS += -L$$DESTDIR -llibPdu
 
 #INCLUDEPATH += $$PWD/../pdu-bin/include
 #DEPENDPATH += $$PWD/../pdu-bin
@@ -30,7 +30,7 @@ DEFINES += LOG_ENABLED LOG_MULTITHREADING
 win32-msvc* {
   # MSVC
   # Disable C996 Warning
-  DEFINES += _CRT_SECURE_NO_WARNINGS snprintf=_snprintf
+  DEFINES += _CRT_SECURE_NO_WARNINGS
 } else {
   # MinGW
   QMAKE_CXXFLAGS += -std=c++0x
