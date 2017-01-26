@@ -36,8 +36,7 @@
       </font>
      </property>
      <property name="text">
-      <string>Hint!
-Double click a cell to send USSD.</string>
+      <string>Double click a cell to send USSD.</string>
      </property>
     </widget>
    </item>

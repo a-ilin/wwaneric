@@ -3,6 +3,8 @@
 
 #include "Database.h"
 
+#include <QUuid>
+
 // from ST-Ericcsson docs
 enum USSD_STATUS
 {
@@ -29,6 +31,7 @@ bool checkUssdSendStatus(int status);
 
 struct Ussd
 {
+  QUuid connectionId;
   QString ussd;
   QString description;
 };

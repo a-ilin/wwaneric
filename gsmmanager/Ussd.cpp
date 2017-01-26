@@ -1,4 +1,4 @@
-﻿#include "Ussd.h"
+#include "Ussd.h"
 
 #include "common.h"
 
@@ -48,8 +48,8 @@ bool UssdDatabaseEntity::initializeDatabase(Database *db) const
 {
   const QString sqlQuery =
       "CREATE TABLE ussd "
-      "(a_ussd BLOB, a_description BLOB, "
-      "PRIMARY KEY (a_ussd) )";
+      "(a_connection CHARACTER(38), a_ussd VARCHAR(64), a_description VARCHAR(128), "
+      "PRIMARY KEY (a_connection, a_ussd) )";
 
   db->qDatabase().exec(sqlQuery);
 
@@ -66,81 +66,27 @@ bool UssdDatabaseEntity::initializeDatabase(Database *db) const
 
 QSqlQuery UssdDatabaseEntity::querySelect(Database *db, const DatabaseKey &key) const
 {
-  QString resultString =
-      "SELECT a_ussd, a_description "
-      "FROM ussd";
-
-  if (key.isEmpty())
-  {
-    QSqlQuery query(resultString, db->qDatabase());
-    return query;
-  }
-
-  resultString.append(" WHERE ");
+  QString queryString =
+      "SELECT a_connection, a_ussd, a_description "
+      "FROM ussd %1 ";
 
   QStringList acceptedValues;
-  acceptedValues << "a_ussd";
-
-  bool needAnd = false;
-
-  DatabaseKey::const_iterator iter = key.constBegin();
-  DatabaseKey::const_iterator iterEnd = key.constEnd();
-
-  // first pass, construct base query string
-  while (iter != iterEnd)
-  {
-    if (acceptedValues.contains(iter.key()))
-    {
-      if (needAnd)
-      {
-        resultString.append(" AND ");
-      }
-
-      resultString.append(QChar(' ') + iter.key() + QString(" = :")+ iter.key() + QChar(' '));
-
-      needAnd = true;
-    }
-    else
-    {
-      Q_ASSERT(false);
-    }
-
-    ++iter;
-  }
+  acceptedValues << "a_connection" << "a_ussd";
 
   QSqlQuery query(db->qDatabase());
-  query.prepare(resultString);
-
-  iter = key.constBegin();
-
-  // second pass, bind values
-  while (iter != iterEnd)
-  {
-    if (acceptedValues.contains(iter.key()))
-    {
-      query.bindValue(QChar(':')+iter.key(), iter.value());
-    }
-    else
-    {
-      Q_ASSERT(false);
-    }
-
-    ++iter;
-  }
+  prepareQueryClause(&query, queryString, key, acceptedValues);
 
   return query;
 }
 
 Ussd UssdDatabaseEntity::createFromSelect(const QList<QVariant> &values) const
 {
-  Q_ASSERT(values.size() == 2);
-
-  QString ussdText = values.at(0).toString();
-  QString ussdDescription = values.at(1).toString();
+  Q_ASSERT(values.size() == 3);
 
   Ussd ussd;
-  ussd.ussd = ussdText;
-  ussd.description = ussdDescription;
+  ussd.connectionId = QUuid(values.at(0).toString());
+  ussd.ussd = values.at(1).toString();
+  ussd.description = values.at(2).toString();
 
   return ussd;
 }
@@ -149,12 +95,13 @@ QSqlQuery UssdDatabaseEntity::queryInsert(Database *db, const Ussd &value) const
 {
   QString resultString =
       "INSERT OR REPLACE "
-      "INTO ussd (a_ussd, a_description) "
-      "VALUES (:a_ussd, :a_description)";
+      "INTO ussd (a_connection, a_ussd, a_description) "
+      "VALUES (:a_connection, :a_ussd, :a_description)";
 
   QSqlQuery query(db->qDatabase());
 
   query.prepare(resultString);
+  query.bindValue(":a_connection", value.connectionId.toString());
   query.bindValue(":a_ussd", value.ussd);
   query.bindValue(":a_description", value.description);
 
@@ -166,17 +113,15 @@ QSqlQuery UssdDatabaseEntity::queryUpdat(Database *db, const DatabaseKey &key, c
   QString resultString =
       "UPDATE ussd "
       "SET a_ussd = :a_ussd, a_description = :a_description "
-      "WHERE a_ussd = :a_ussd_key";
-
-  Q_ASSERT(key.size() == 1);
-  QString ussdKey = key.value("a_ussd").toString();
+      "WHERE a_ussd = :a_ussd_key AND a_connection = :a_connection ";
 
   QSqlQuery query(db->qDatabase());
 
   query.prepare(resultString);
   query.bindValue(":a_ussd", value.ussd);
   query.bindValue(":a_description", value.description);
-  query.bindValue(":a_ussd_key", ussdKey);
+  query.bindValue(":a_ussd_key", key.value("a_ussd").toString());
+  query.bindValue(":a_connection", key.value("a_connection").toString());
 
   return query;
 }
@@ -188,7 +133,7 @@ QSqlQuery UssdDatabaseEntity::queryDelet(Database *db, const DatabaseKey &key) c
       "FROM ussd %1 ";
 
   QStringList acceptedValues;
-  acceptedValues << "a_ussd";
+  acceptedValues << "a_connection" << "a_ussd";
 
   QSqlQuery query(db->qDatabase());
   prepareQueryClause(&query, queryString, key, acceptedValues);

@@ -1,4 +1,4 @@
-﻿#include "UssdView.h"
+#include "UssdView.h"
 #include "ui_UssdView.h"
 
 #include "Core.h"
@@ -72,7 +72,9 @@ void UssdView::restore(Settings & /*set*/)
   UssdDatabaseEntity ussdDb;
   if (ussdDb.init())
   {
-    updateUssd(ussdDb.select());
+    DatabaseKey key;
+    key["a_connection"] = connectionId().toString();
+    updateUssd(ussdDb.select(key));
   }
 }
 
@@ -249,13 +251,12 @@ void UssdView::addToPredefined()
       UssdDatabaseEntity ussdDb;
       if (ussdDb.init())
       {
-        QList<Ussd> ussdList;
         Ussd ussdItem;
+        ussdItem.connectionId = connectionId();
         ussdItem.ussd = ussd;
         ussdItem.description = QString();
-        ussdList.append(ussdItem);
 
-        ussdDb.insert(ussdList);
+        ussdDb.insert(QList<Ussd>() << ussdItem);
       }
     }
   }
@@ -273,6 +274,7 @@ void UssdView::updateDbUssd(const QString &oldUssd,
   if (ussdDb.init())
   {
     DatabaseKey key;
+    key.insert("a_connection", connectionId().toString());
     key.insert("a_ussd", oldUssd);
 
     QList<Ussd> existed = ussdDb.select(key);
@@ -299,6 +301,7 @@ void UssdView::deleteDbUssd(const QList<QString> &ussdList)
     foreach (const QString &ussd, ussdList)
     {
       DatabaseKey key;
+      key.insert("a_connection", connectionId().toString());
       key.insert("a_ussd", ussd);
 
       ussdDb.delet(key);
