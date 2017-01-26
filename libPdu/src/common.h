@@ -1,5 +1,5 @@
-#ifndef COMMON_H
-#define COMMON_H
+#ifndef PDU_COMMON_H
+#define PDU_COMMON_H
 
 #ifdef PDU_DECODE_EXPORTS
 #define PDU_DECODE_API __declspec(dllexport)
@@ -7,4 +7,4 @@
 #define PDU_DECODE_API __declspec(dllimport)
 #endif
 
-#endif // COMMON_H
+#endif // PDU_COMMON_H

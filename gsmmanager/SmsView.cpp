@@ -1,4 +1,4 @@
-﻿#include "SmsView.h"
+#include "SmsView.h"
 #include "ui_SmsView.h"
 
 #include "Core.h"
@@ -210,7 +210,9 @@ SMS_STATUS SmsModel::smsStatus(int row) const
       break;
     default:
       Q_ASSERT(!neu);
+#ifdef QT_DEBUG
       Q_ASSERT(!income);
+#endif
       break;
     }
   }
