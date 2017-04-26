@@ -1,4 +1,4 @@
-﻿/*
+/*
  *  pdu_deliver.cpp
  *  libPDU
  *
@@ -198,6 +198,8 @@ const Pdu_Concatenated *Pdu_Deliver::getConcatenated ( void ) const
 
             return concat;
         }
+
+        ++iter;
     }
 
     return NULL;
